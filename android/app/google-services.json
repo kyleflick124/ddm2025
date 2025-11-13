@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "920232777173",
+    "project_id": "ddm2025-fernandofelipemauricio",
+    "storage_bucket": "ddm2025-fernandofelipemauricio.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:920232777173:android:f97e9b9a51c3024baad95c",
+        "android_client_info": {
+          "package_name": "com.example.t4"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD5xCC8j3LFizo4ufdEa9Kd6Hfop0dMPgs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
