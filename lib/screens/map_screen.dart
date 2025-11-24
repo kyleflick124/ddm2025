@@ -45,7 +45,7 @@ class _MapScreenState extends State<MapScreen> {
     await prefs.setString('alerts', jsonEncode(alerts));
   }
 
-  void _updatePosition() {
+  void _updatePosition() async {
     final dx = (_random.nextDouble() * 20 - 10);
     final dy = (_random.nextDouble() * 20 - 10);
     final newPos = Offset(
@@ -74,6 +74,11 @@ class _MapScreenState extends State<MapScreen> {
       // Reseta o estado de alerta quando volta à área segura
       if (!isOut) _alertTriggered = false;
     });
+
+    // Save position to SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('map_position_x', newPos.dx);
+    await prefs.setDouble('map_position_y', newPos.dy);
   }
 
   void _startSimulation() {
@@ -104,8 +109,27 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
-    _safeCenter = _position + const Offset(_iconSize / 2, _iconSize);
-    _path.add(_safeCenter);
+    _loadMapState();
+  }
+
+  Future<void> _loadMapState() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final savedX = prefs.getDouble('map_position_x');
+    final savedY = prefs.getDouble('map_position_y');
+    final savedInterval = prefs.getInt('map_interval');
+
+    setState(() {
+      if (savedX != null && savedY != null) {
+        _position = Offset(savedX, savedY);
+      }
+      if (savedInterval != null) {
+        _interval = savedInterval;
+      }
+      _safeCenter = _position + const Offset(_iconSize / 2, _iconSize);
+      _path.add(_safeCenter);
+    });
+
     _startSimulation();
   }
 
@@ -143,7 +167,8 @@ class _MapScreenState extends State<MapScreen> {
                       height: 320,
                       decoration: BoxDecoration(
                         color: Colors.grey.shade300,
-                        border: Border.all(color: Colors.grey.shade600, width: 2),
+                        border:
+                            Border.all(color: Colors.grey.shade600, width: 2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: CustomPaint(
@@ -267,10 +292,14 @@ class _MapScreenState extends State<MapScreen> {
                         DropdownMenuItem(value: 5, child: Text('5 s')),
                         DropdownMenuItem(value: 10, child: Text('10 s')),
                       ],
-                      onChanged: (val) {
+                      onChanged: (val) async {
                         if (val != null) {
                           setState(() => _interval = val);
                           _startSimulation();
+
+                          // Save interval to SharedPreferences
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setInt('map_interval', val);
                         }
                       },
                     ),
@@ -303,8 +332,8 @@ class _MapPainter extends CustomPainter {
     // área segura
     final safePaint = Paint()
       ..color = (isOutOfBounds
-              ? Colors.redAccent.withOpacity(0.15)
-              : Colors.greenAccent.withOpacity(0.15))
+          ? Colors.redAccent.withOpacity(0.15)
+          : Colors.greenAccent.withOpacity(0.15))
       ..style = PaintingStyle.fill;
 
     canvas.drawCircle(safeCenter, safeRadius, safePaint);
