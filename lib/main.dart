@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
@@ -13,8 +15,16 @@ import 'screens/device_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
 import 'providers/theme_provider.dart';
+import 'providers/locale_provider.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
   runApp(const ProviderScope(child: ElderMonitorApp()));
 }
 
@@ -24,6 +34,7 @@ class ElderMonitorApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeProvider);
+    final locale = ref.watch(localeProvider);
 
     return MaterialApp(
       title: 'Elder Monitor',
@@ -58,6 +69,7 @@ class ElderMonitorApp extends ConsumerWidget {
         ),
       ),
       themeMode: themeMode,
+      locale: locale,
       initialRoute: '/splash',
       supportedLocales: const [
         Locale('en'),
