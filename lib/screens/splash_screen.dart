@@ -71,7 +71,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
-            const Text("Cuidando de quem você ama"),
+            const TranslatedText("Cuidando de quem você ama"),
           ],
         ),
       ),

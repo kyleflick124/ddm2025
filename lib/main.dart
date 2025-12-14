@@ -18,6 +18,7 @@ import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/elder_home_screen.dart';
 import 'screens/elder_profile_screen.dart';
+import 'screens/watch_home_screen.dart';
 import 'providers/theme_provider.dart';
 import 'providers/locale_provider.dart';
 import 'providers/session_provider.dart';
@@ -104,6 +105,7 @@ class ElderMonitorApp extends ConsumerWidget {
         '/elder_profile': (context) => const ElderProfileScreen(),
         '/settings': (context) => const SettingsScreen(),
         '/elder_home': (context) => const ElderHomeScreen(),
+        '/watch_home': (context) => const WatchHomeScreen(),
       },
     );
   }

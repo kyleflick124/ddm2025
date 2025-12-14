@@ -1,8 +1,9 @@
 import 'dart:convert';
-import 'package:elder_monitor/providers/locale_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../providers/locale_provider.dart';
+import 'package:elder_monitor/providers/locale_provider.dart';
 
 class ElderProfileScreen extends ConsumerStatefulWidget {
   const ElderProfileScreen({super.key});
@@ -49,7 +50,7 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
     await prefs.setString('elder_email', _emailController.text);
     setState(() => _isEditing = false);
     ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: TranslatedText('Dados salvos!')));
+        .showSnackBar(SnackBar(content: TranslatedText('Dados salvos!')));
   }
 
   Future<void> _loadCaregivers() async {
@@ -134,7 +135,7 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const TranslatedText('Perfil / Família'),
+        title: TranslatedText('Perfil / Família'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pushReplacementNamed(context, '/elder_home'),
@@ -223,7 +224,7 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
             ElevatedButton(
               onPressed: _addCaregiver,
               style: ElevatedButton.styleFrom(backgroundColor: buttonColor),
-              child: const TranslatedText('Adicionar', style: TextStyle(color: Colors.black)),
+              child: TranslatedText('Adicionar', style: TextStyle(color: Colors.black)),
             ),
           ],
         ),
@@ -231,14 +232,8 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
     );
   }
 
-  Widget _buildTextField(
-    String labelKey,
-    TextEditingController controller, {
-    TextInputType? keyboardType,
-    bool enabled = true,
-    required Color textColor,
-    required Color cardColor,
-  }) {
+  Widget _buildTextField(String label, TextEditingController controller,
+      {TextInputType? keyboardType, bool enabled = true, required Color textColor, required Color cardColor}) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,

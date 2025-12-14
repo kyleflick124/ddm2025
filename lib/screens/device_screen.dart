@@ -1,21 +1,23 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/firebase_sync_service.dart';
 import '../providers/locale_provider.dart';
+import '../providers/elder_provider.dart';
 
-class DeviceScreen extends StatefulWidget {
+class DeviceScreen extends ConsumerStatefulWidget {
   const DeviceScreen({super.key});
 
   @override
-  State<DeviceScreen> createState() => _DeviceScreenState();
+  ConsumerState<DeviceScreen> createState() => _DeviceScreenState();
 }
 
-class _DeviceScreenState extends State<DeviceScreen> {
+class _DeviceScreenState extends ConsumerState<DeviceScreen> {
   Map<String, dynamic>? _deviceStatus;
   bool _isLoading = true;
   bool _isOnline = false;
 
-  final String _elderId = 'elder_demo';
+  String get _elderId => ref.read(activeElderIdProvider) ?? 'elder_demo';
   final FirebaseSyncService _syncService = FirebaseSyncService();
   StreamSubscription? _deviceSubscription;
 

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/theme_provider.dart';
 import '../providers/locale_provider.dart';
+import '../providers/elder_provider.dart';
 import '../models/health_data.dart';
 import '../services/firebase_sync_service.dart';
 
@@ -29,7 +30,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _isLoading = true;
 
   // Firebase
-  final String _elderId = 'elder_demo';
+  String get _elderId => ref.read(activeElderIdProvider) ?? 'elder_demo';
   final FirebaseSyncService _syncService = FirebaseSyncService();
   StreamSubscription? _healthSubscription;
 
@@ -200,7 +201,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
 
                     const SizedBox(height: 8),
-                    TranslatedText(
+                    Text(
                       _timeSinceUpdate(),
                       style: TextStyle(fontSize: 12, color: cardTextColor),
                     ),

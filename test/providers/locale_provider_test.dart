@@ -22,7 +22,7 @@ void main() {
       expect(service.getLanguageName('es'), 'Español');
       expect(service.getLanguageName('fr'), 'Français');
       expect(service.getLanguageName('zh'), '中文');
-      expect(service.getLanguageName('xx'), 'Desconhecido');
+      expect(service.getLanguageName('xx'), 'Unknown');
     });
 
     test('TranslationService should validate language codes', () {

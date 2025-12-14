@@ -295,4 +295,172 @@ class FirebaseSyncService {
     final ref = _database.ref('${getGeofencesPath(elderId)}/$geofenceId');
     await ref.remove();
   }
+
+  // ==================== Multi-Elder System Operations ====================
+
+  /// Get path for caregiver data
+  static String getCaregiverPath(String caregiverId) {
+    return 'caregivers/$caregiverId';
+  }
+
+  /// Get path for caregiver's elders list
+  static String getCaregiverEldersPath(String caregiverId) {
+    return 'caregivers/$caregiverId/elders';
+  }
+
+  /// Get path for elder's profile
+  static String getElderProfilePath(String elderId) {
+    return 'elders/$elderId/profile';
+  }
+
+  /// Register a new caregiver
+  Future<void> registerCaregiver({
+    required String caregiverId,
+    required String email,
+    required String name,
+  }) async {
+    final ref = _database.ref(getCaregiverPath(caregiverId));
+    await ref.set({
+      'email': email,
+      'name': name,
+      'createdAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Register a new elder and link to caregiver
+  Future<String> registerElder({
+    required String caregiverId,
+    required String name,
+    required String age,
+    String? phone,
+    String? email,
+    String? medicalCondition,
+  }) async {
+    // Generate unique elder ID
+    final elderId = 'elder_${_uuid.v4().substring(0, 8)}';
+    
+    // Create elder profile
+    final elderRef = _database.ref(getElderProfilePath(elderId));
+    await elderRef.set({
+      'name': name,
+      'age': age,
+      'phone': phone ?? '',
+      'email': email ?? '',
+      'medicalCondition': medicalCondition ?? '',
+      'createdAt': DateTime.now().toIso8601String(),
+      'caregiverId': caregiverId,
+    });
+
+    // Link elder to caregiver
+    await linkElderToCaregiver(caregiverId, elderId);
+
+    // Set as active elder if first one
+    final elders = await getCaregiverElders(caregiverId);
+    if (elders.length == 1) {
+      await setActiveElder(caregiverId, elderId);
+    }
+
+    return elderId;
+  }
+
+  /// Link an existing elder to a caregiver
+  Future<void> linkElderToCaregiver(String caregiverId, String elderId) async {
+    final ref = _database.ref('${getCaregiverEldersPath(caregiverId)}/$elderId');
+    await ref.set({
+      'linkedAt': DateTime.now().toIso8601String(),
+      'active': true,
+    });
+  }
+
+  /// Remove elder from caregiver's list
+  Future<void> unlinkElderFromCaregiver(String caregiverId, String elderId) async {
+    final ref = _database.ref('${getCaregiverEldersPath(caregiverId)}/$elderId');
+    await ref.remove();
+  }
+
+  /// Get all elders for a caregiver
+  Future<List<Map<String, dynamic>>> getCaregiverElders(String caregiverId) async {
+    final ref = _database.ref(getCaregiverEldersPath(caregiverId));
+    final snapshot = await ref.get();
+    
+    if (!snapshot.exists) return [];
+    
+    final data = snapshot.value as Map<dynamic, dynamic>;
+    final List<Map<String, dynamic>> elders = [];
+    
+    for (final entry in data.entries) {
+      final elderId = entry.key as String;
+      final elderProfile = await getElderProfile(elderId);
+      if (elderProfile != null) {
+        elders.add({
+          'id': elderId,
+          ...elderProfile,
+        });
+      }
+    }
+    
+    return elders;
+  }
+
+  /// Get elder profile
+  Future<Map<String, dynamic>?> getElderProfile(String elderId) async {
+    final ref = _database.ref(getElderProfilePath(elderId));
+    final snapshot = await ref.get();
+    
+    if (!snapshot.exists) return null;
+    return Map<String, dynamic>.from(snapshot.value as Map);
+  }
+
+  /// Update elder profile
+  Future<void> updateElderProfile(String elderId, Map<String, dynamic> data) async {
+    final ref = _database.ref(getElderProfilePath(elderId));
+    await ref.update(data);
+  }
+
+  /// Set active elder for a caregiver
+  Future<void> setActiveElder(String caregiverId, String elderId) async {
+    final ref = _database.ref('${getCaregiverPath(caregiverId)}/activeElder');
+    await ref.set(elderId);
+  }
+
+  /// Get active elder for a caregiver
+  Future<String?> getActiveElder(String caregiverId) async {
+    final ref = _database.ref('${getCaregiverPath(caregiverId)}/activeElder');
+    final snapshot = await ref.get();
+    
+    if (!snapshot.exists) return null;
+    return snapshot.value as String;
+  }
+
+  /// Listen to caregiver's elders list
+  Stream<List<Map<String, dynamic>>> listenToCaregiverElders(String caregiverId) {
+    final ref = _database.ref(getCaregiverEldersPath(caregiverId));
+    return ref.onValue.asyncMap((event) async {
+      final data = event.snapshot.value as Map<dynamic, dynamic>?;
+      if (data == null) return <Map<String, dynamic>>[];
+      
+      final List<Map<String, dynamic>> elders = [];
+      for (final entry in data.entries) {
+        final elderId = entry.key as String;
+        final elderProfile = await getElderProfile(elderId);
+        if (elderProfile != null) {
+          elders.add({
+            'id': elderId,
+            ...elderProfile,
+          });
+        }
+      }
+      return elders;
+    });
+  }
+
+  /// Listen to active elder changes
+  Stream<String?> listenToActiveElder(String caregiverId) {
+    final ref = _database.ref('${getCaregiverPath(caregiverId)}/activeElder');
+    return ref.onValue.map((event) {
+      if (!event.snapshot.exists) return null;
+      return event.snapshot.value as String;
+    });
+  }
 }
+

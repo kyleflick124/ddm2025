@@ -1,3 +1,8 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/firebase_sync_service.dart';
+import '../providers/locale_provider.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:async';
@@ -14,388 +19,257 @@ class ElderHomeScreen extends ConsumerStatefulWidget {
   ConsumerState<ElderHomeScreen> createState() => _ElderHomeScreenState();
 }
 
-class _MenuItem {
-  final String title;
-  final IconData icon;
-  final String route;
-  _MenuItem(this.title, this.icon, this.route);
-}
-
 class _ElderHomeScreenState extends ConsumerState<ElderHomeScreen> {
-  int heartRate = 78;
-  int spo2 = 96;
-  bool insideGeofence = true;
-  DateTime lastUpdate = DateTime.now();
-
-  Timer? _timer;
-  double _progress = 0.0;
-  final int _updateInterval = 10; // intervalo fixo
-
-  final List<_MenuItem> menuItems = [
-    _MenuItem('Painel', Icons.dashboard, '/dashboard'),
-    _MenuItem('Alertas', Icons.notifications, '/alerts'),
-    _MenuItem('Dispositivo', Icons.watch, '/device'),
-    _MenuItem('Mapa', Icons.map, '/map'),
-  ];
-
-  Future<int> _getUnreadCount() async {
-    final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getString('alerts');
-    if (stored == null) return 0;
-    final alerts = List<Map<String, dynamic>>.from(jsonDecode(stored));
-    return alerts.where((a) => !a['read']).length;
-  }
-
-  void _refreshStatus() {
-    final rand = Random();
-    setState(() {
-      heartRate = 60 + rand.nextInt(60); // 60–120 bpm
-      spo2 = 90 + rand.nextInt(10); // 90–99%
-      insideGeofence = rand.nextBool();
-      lastUpdate = DateTime.now();
-      _progress = 0.0;
-    });
-  }
-
-  void _startAutoUpdate() {
-    _timer?.cancel();
-    const tick = Duration(milliseconds: 100);
-    final totalTicks = _updateInterval * 10; // 100ms * 10 = 1s
-    int currentTick = 0;
-
-    _timer = Timer.periodic(tick, (t) {
-      setState(() {
-        currentTick++;
-        _progress = currentTick / totalTicks;
-        if (_progress >= 1.0) {
-          _refreshStatus();
-          currentTick = 0;
-          _progress = 0.0;
-        }
-      });
-    });
-  }
-
-  String _timeSinceUpdate() {
-    final diff = DateTime.now().difference(lastUpdate);
-    if (diff.inMinutes < 1) return 'Atualizado há poucos segundos';
-    if (diff.inMinutes < 60) return 'Atualizado há ${diff.inMinutes} min';
-    return 'Atualizado há ${diff.inHours} h';
-  }
+  final FirebaseSyncService _syncService = FirebaseSyncService();
+  
+  bool _isSendingEmergency = false;
+  String _lastSyncTime = 'Aguardando...';
+  bool _isConnected = false;
 
   @override
   void initState() {
     super.initState();
-    _refreshStatus();
-    _startAutoUpdate();
+    _checkConnection();
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
+  void _checkConnection() {
+    // Simple connection check
+    setState(() {
+      _isConnected = true;
+      _lastSyncTime = _formatTime(DateTime.now());
+    });
+  }
+
+  String _formatTime(DateTime time) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  Future<void> _sendEmergencyAlert() async {
+    setState(() => _isSendingEmergency = true);
+
+    try {
+      // TODO: Get actual elderId from auth/session
+      const elderId = 'elder_demo';
+      
+      // Create emergency alert
+      await _syncService.createAlert(
+        elderId,
+        'EMERGÊNCIA - SOS',
+        'O idoso acionou o botão de emergência!',
+      );
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            icon: const Icon(Icons.check_circle, color: Colors.green, size: 64),
+            title: TranslatedText('Alerta Enviado!'),
+            content: TranslatedText(
+              'Seu cuidador foi notificado. Mantenha a calma e aguarde.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: TranslatedText('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: TranslatedText('Erro ao enviar alerta. Tente novamente.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isSendingEmergency = false);
+    }
+  }
+
+  void _confirmEmergency() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.warning, color: Colors.red, size: 48),
+        title: TranslatedText('Chamar Emergência?'),
+        content: TranslatedText(
+          'Isso enviará um alerta imediato para seu cuidador.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: TranslatedText('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _sendEmergencyAlert();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: TranslatedText('SIM, CHAMAR!', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final themeMode = ref.watch(themeProvider);
-    final bool isDark = themeMode == ThemeMode.dark;
-    final bool isWide = MediaQuery.of(context).size.width > 700;
-    final crossAxisCount = isWide ? 4 : 2;
-
-    final cardTextColor = isDark ? Colors.white : Colors.black87;
-    final progressColor = isDark ? Colors.tealAccent : Colors.blueAccent;
-    final progressBgColor = isDark ? Colors.white12 : Colors.grey.shade300;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
       appBar: AppBar(
-        title: const TranslatedText('Monitoramento de Idosos'),
+        title: TranslatedText('Minha Saúde'),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.person),
             tooltip: 'Perfil',
-            onPressed: () {
-              Navigator.pushNamedAndRemoveUntil(
-                  context, '/elder_profile', (route) => route.isFirst);
-            },
+            onPressed: () => Navigator.pushNamed(context, '/elder_profile'),
           ),
           IconButton(
             icon: const Icon(Icons.settings),
             tooltip: 'Configurações',
-            onPressed: () {
-              Navigator.pushNamedAndRemoveUntil(
-                  context, '/settings', (route) => route.isFirst);
-            },
+            onPressed: () => Navigator.pushNamed(context, '/settings'),
           ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sair',
-            onPressed: () {
-              Navigator.pushNamedAndRemoveUntil(
-                  context, '/login', (route) => false);
-            },
+            onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // --- PAINEL DE STATUS DO IDOSO ---
-            Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-              color: isDark ? Colors.grey[850] : Colors.white,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    TranslatedText(
-                      'Resumo do Idoso Monitorado',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: cardTextColor,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _StatusItem(
-                          icon: Icons.favorite,
-                          label: 'Batimentos',
-                          value: '$heartRate bpm',
-                          color: heartRate > 110 || heartRate < 60
-                              ? Colors.red
-                              : Colors.green,
-                        ),
-                        _StatusItem(
-                          icon: Icons.bloodtype,
-                          label: 'Oxigênio',
-                          value: '$spo2%',
-                          color: spo2 < 94 ? Colors.orange : Colors.green,
-                        ),
-                        _StatusItem(
-                          icon: Icons.location_on,
-                          label: 'Geofence',
-                          value: insideGeofence
-                              ? 'Dentro da área segura'
-                              : 'Fora da área segura',
-                          color:
-                              insideGeofence ? Colors.green : Colors.redAccent,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    LinearProgressIndicator(
-                      value: _progress,
-                      minHeight: 6,
-                      backgroundColor: progressBgColor,
-                      color: progressColor,
-                    ),
-                    const SizedBox(height: 8),
-                    TranslatedText(
-                      'Próxima atualização em $_updateInterval s',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: cardTextColor.withOpacity(0.6)),
-                    ),
-                    TranslatedText(
-                      _timeSinceUpdate(),
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: cardTextColor.withOpacity(0.6)),
-                    ),
-                    const SizedBox(height: 8),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            isDark ? Colors.teal[700] : Colors.blue.shade100,
-                      ),
-                      onPressed: _refreshStatus,
-                      icon: const Icon(Icons.refresh),
-                      label: const TranslatedText('Atualizar agora'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // --- GRADE DE FUNCIONALIDADES ---
-            Expanded(
-              child: GridView.builder(
-                itemCount: menuItems.length,
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: isWide ? 1.1 : 1.0,
-                ),
-                itemBuilder: (context, index) {
-                  final item = menuItems[index];
-
-                  final baseColor =
-                      isDark ? Colors.grey[700]! : Colors.blue.shade100;
-                  final hoverColor =
-                      isDark ? Colors.teal[700]! : Colors.blue.shade200;
-                  final iconColor = isDark ? Colors.white : Colors.blueAccent;
-
-                  if (item.title == 'Alertas') {
-                    return FutureBuilder<int>(
-                      future: _getUnreadCount(),
-                      builder: (context, snapshot) {
-                        final unread = snapshot.data ?? 0;
-                        final hasUnread = unread > 0;
-                        return _HoverAnimatedButton(
-                          color:
-                              hasUnread ? Colors.red.shade100 : baseColor,
-                          hoverColor:
-                              hasUnread ? Colors.red.shade200 : hoverColor,
-                          iconColor: hasUnread ? Colors.redAccent : iconColor,
-                          icon: item.icon,
-                          label: item.title,
-                          badgeCount: unread,
-                          onTap: () => Navigator.pushNamedAndRemoveUntil(
-                              context, item.route, (route) => route.isFirst),
-                        );
-                      },
-                    );
-                  }
-
-                  return _HoverAnimatedButton(
-                    color: baseColor,
-                    hoverColor: hoverColor,
-                    iconColor: iconColor,
-                    icon: item.icon,
-                    label: item.title,
-                    onTap: () => Navigator.pushNamedAndRemoveUntil(
-                        context, item.route, (route) => route.isFirst),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// StatusItem
-class _StatusItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  const _StatusItem({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(icon, size: 36, color: color),
-        const SizedBox(height: 4),
-        TranslatedText(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-        TranslatedText(value, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
-      ],
-    );
-  }
-}
-
-// HoverAnimatedButton
-class _HoverAnimatedButton extends StatefulWidget {
-  final Color color;
-  final Color hoverColor;
-  final Color? iconColor;
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final int? badgeCount;
-
-  const _HoverAnimatedButton({
-    required this.color,
-    required this.hoverColor,
-    this.iconColor,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.badgeCount,
-  });
-
-  @override
-  State<_HoverAnimatedButton> createState() => _HoverAnimatedButtonState();
-}
-
-class _HoverAnimatedButtonState extends State<_HoverAnimatedButton> {
-  bool isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final currentColor = isHovered ? widget.hoverColor : widget.color;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => isHovered = true),
-      onExit: (_) => setState(() => isHovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        decoration: BoxDecoration(
-          color: currentColor,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: const [
-            BoxShadow(
-                color: Colors.black26, blurRadius: 5, offset: Offset(0, 2)),
-          ],
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: widget.onTap,
-          child: Stack(
-            alignment: Alignment.topRight,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
             children: [
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(widget.icon, size: 40, color: widget.iconColor),
-                    const SizedBox(height: 10),
-                    TranslatedText(
-                      widget.label,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600, color: widget.iconColor),
-                    ),
-                  ],
-                ),
-              ),
-              if (widget.badgeCount != null && widget.badgeCount! > 0)
-                Positioned(
-                  right: 12,
-                  top: 12,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.redAccent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: TranslatedText(
-                      widget.badgeCount.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+              // Status card
+              Card(
+                color: isDark ? Colors.grey[850] : Colors.white,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _isConnected ? Icons.cloud_done : Icons.cloud_off,
+                        color: _isConnected ? Colors.green : Colors.red,
+                        size: 32,
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TranslatedText(
+                              _isConnected ? 'Conectado' : 'Desconectado',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: _isConnected ? Colors.green : Colors.red,
+                              ),
+                            ),
+                            Text(
+                              'Última sincronização: $_lastSyncTime',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+              ),
+
+              const Spacer(),
+
+              // Emergency SOS Button - Main feature
+              GestureDetector(
+                onTap: _isSendingEmergency ? null : _confirmEmergency,
+                child: Container(
+                  width: screenHeight * 0.3,
+                  height: screenHeight * 0.3,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.red,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.withValues(alpha: 0.5),
+                        blurRadius: 30,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: _isSendingEmergency
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.sos,
+                                size: 64,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(height: 8),
+                              TranslatedText(
+                                'EMERGÊNCIA',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+              TranslatedText(
+                'Pressione para chamar seu cuidador',
+                style: TextStyle(
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                ),
+              ),
+
+              const Spacer(),
+
+              // Simple info text
+              Card(
+                color: isDark ? Colors.teal[800] : Colors.teal[50],
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: isDark ? Colors.teal[200] : Colors.teal[700],
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TranslatedText(
+                          'Seu smartwatch está monitorando sua saúde automaticamente.',
+                          style: TextStyle(
+                            color: isDark ? Colors.teal[100] : Colors.teal[800],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),
