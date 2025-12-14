@@ -84,7 +84,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     // For now, just show a message that we're waiting
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Aguardando sincronização do relógio...'),
+        content: TranslatedText('Aguardando sincronização do relógio...'),
       ),
     );
   }
@@ -102,7 +102,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dispositivo'),
+        title: const TranslatedText('Dispositivo'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
@@ -135,7 +135,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  Text(
+                  TranslatedText(
                     'Ações Rápidas',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
@@ -211,7 +211,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            const TranslatedText(
               'Status do Relógio',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
@@ -221,7 +221,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 color: _isOnline ? Colors.green : Colors.grey,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(
+              child: TranslatedText(
                 _isOnline ? 'Online' : 'Offline',
                 style: const TextStyle(
                   color: Colors.white,
@@ -235,24 +235,24 @@ class _DeviceScreenState extends State<DeviceScreen> {
         const SizedBox(height: 8),
         ListTile(
           leading: const Icon(Icons.watch, color: Colors.blueAccent),
-          title: Text('Modelo: $model'),
-          subtitle: Text('Firmware $firmwareVersion'),
+          title: TranslatedText('Modelo: $model'),
+          subtitle: TranslatedText('Firmware $firmwareVersion'),
         ),
         ListTile(
           leading: Icon(
             isCharging ? Icons.battery_charging_full : _getBatteryIcon(batteryLevel),
             color: _getBatteryColor(batteryLevel),
           ),
-          title: Text('Bateria: $batteryLevel%'),
-          subtitle: Text(isCharging ? 'Carregando' : _getBatteryStatus(batteryLevel)),
+          title: TranslatedText('Bateria: $batteryLevel%'),
+          subtitle: TranslatedText(isCharging ? 'Carregando' : _getBatteryStatus(batteryLevel)),
         ),
         ListTile(
           leading: Icon(
             _isOnline ? Icons.wifi : Icons.wifi_off,
             color: _isOnline ? Colors.green : Colors.grey,
           ),
-          title: Text('Conectividade: ${_isOnline ? "Conectado" : "Desconectado"}'),
-          subtitle: Text('Última sincronização: ${_formatLastSync(lastSync)}'),
+          title: TranslatedText('Conectividade: ${_isOnline ? "Conectado" : "Desconectado"}'),
+          subtitle: TranslatedText('Última sincronização: ${_formatLastSync(lastSync)}'),
         ),
       ],
     );
@@ -325,7 +325,7 @@ class _ActionButtonState extends State<_ActionButton> {
               children: [
                 Icon(widget.icon, size: 40, color: Colors.white),
                 const SizedBox(height: 10),
-                Text(
+                TranslatedText(
                   widget.label,
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,

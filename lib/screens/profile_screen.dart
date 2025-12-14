@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:elder_monitor/providers/locale_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -49,7 +50,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     await prefs.setString('elder_email', _emailController.text);
     setState(() => _isEditing = false);
     ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Dados do idoso salvos!')));
+        .showSnackBar(const SnackBar(content: TranslatedText('Dados do idoso salvos!')));
   }
 
   Future<void> _loadCaregivers() async {
@@ -134,7 +135,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Perfil / Família'),
+        title: const TranslatedText('Perfil / Família'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
@@ -179,14 +180,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ? _saveElderData
                   : () => setState(() => _isEditing = true),
               style: ElevatedButton.styleFrom(backgroundColor: buttonColor),
-              child: Text(
+              child: TranslatedText(
                   _isEditing
                       ? 'Salvar dados do idoso'
                       : 'Editar dados do idoso',
                   style: TextStyle(color: Colors.black)),
             ),
             const SizedBox(height: 24),
-            Text('Cuidadores cadastrados',
+            TranslatedText('Cuidadores cadastrados',
                 style:
                     TextStyle(fontWeight: FontWeight.bold, color: textColor)),
             const SizedBox(height: 12),
@@ -201,7 +202,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   child: ListTile(
                     title: Text(caregiver['name'] ?? '',
                         style: TextStyle(color: textColor)),
-                    subtitle: Text(
+                    subtitle: TranslatedText(
                         '${caregiver['email'] ?? ''} | ${caregiver['phone'] ?? ''}',
                         style: TextStyle(color: textColor)),
                     trailing: IconButton(
@@ -213,7 +214,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               },
             ),
             const SizedBox(height: 12),
-            Text('Adicionar cuidador',
+            TranslatedText('Adicionar cuidador',
                 style:
                     TextStyle(fontWeight: FontWeight.bold, color: textColor)),
             const SizedBox(height: 8),
@@ -233,7 +234,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ElevatedButton(
               onPressed: _addCaregiver,
               style: ElevatedButton.styleFrom(backgroundColor: buttonColor),
-              child: const Text('Adicionar',
+              child: const TranslatedText('Adicionar',
                   style: TextStyle(color: Colors.black)),
             ),
           ],
@@ -242,24 +243,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller,
-      {TextInputType? keyboardType,
-      bool enabled = true,
-      required Color textColor,
-      required Color cardColor}) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      enabled: enabled,
-      style: TextStyle(color: textColor),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: textColor),
-        filled: true,
-        fillColor: cardColor,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+  Widget _buildTextField(
+  String labelKey,
+  TextEditingController controller, {
+  TextInputType? keyboardType,
+  bool enabled = true,
+  required Color textColor,
+  required Color cardColor,
+}) {
+  return TextField(
+    controller: controller,
+    keyboardType: keyboardType,
+    enabled: enabled,
+    style: TextStyle(color: textColor),
+    decoration: InputDecoration(
+      label: TranslatedText(
+        labelKey,
+        style: TextStyle(color: textColor),
       ),
-    );
-  }
+      filled: true,
+      fillColor: cardColor,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 8,
+      ),
+    ),
+  );
+}
+
 }

@@ -1,3 +1,4 @@
+import 'package:elder_monitor/providers/locale_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/google_auth_service.dart';
@@ -32,7 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Login com Google cancelado'),
+            content: TranslatedText('Login com Google cancelado'),
           ),
         );
       }
@@ -40,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro no login com Google: $e'),
+          content: TranslatedText('Erro no login com Google: $e'),
         ),
       );
     }
@@ -55,7 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              const TranslatedText(
                 'Bem-vindo',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
@@ -66,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
               // Email
               const TextField(
                 decoration: InputDecoration(
-                  labelText: 'Email',
+                  label: TranslatedText('Email'),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -76,7 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
               // Senha
               const TextField(
                 decoration: InputDecoration(
-                  labelText: 'Senha',
+                  label: TranslatedText('Senha'),
                   border: OutlineInputBorder(),
                 ),
                 obscureText: true,
@@ -84,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 24),
 
-              const Text(
+              const TranslatedText(
                 'Como deseja acessar?',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -104,7 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         : Colors.grey,
                   ),
                 ),
-                child: Text(
+                child: TranslatedText(
                   'Sou Cuidador',
                   style: TextStyle(
                     color: selectedRole == 'cuidador'
@@ -129,7 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         : Colors.grey,
                   ),
                 ),
-                child: Text(
+                child: TranslatedText(
                   'Sou o Idoso',
                   style: TextStyle(
                     color:
@@ -144,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
               // LOGIN NORMAL
               ElevatedButton(
                 onPressed: selectedRole == null ? null : _navigateAfterLogin,
-                child: const Text('Entrar'),
+                child: const TranslatedText('Entrar'),
               ),
 
               const SizedBox(height: 16),
@@ -155,7 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   Expanded(child: Divider()),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('ou'),
+                    child: TranslatedText('ou'),
                   ),
                   Expanded(child: Divider()),
                 ],
@@ -166,7 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
               // LOGIN COM GOOGLE
               ElevatedButton.icon(
                 icon: const Icon(Icons.login),
-                label: const Text('Entrar com Google'),
+                label: const TranslatedText('Entrar com Google'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.redAccent,
                   foregroundColor: Colors.white,
