@@ -164,7 +164,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                           const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: ListTile(
                         leading: Icon(icon, color: iconColor),
-                        title: Text(
+                        title: TranslatedText(
                           title,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
@@ -175,11 +175,11 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (body.isNotEmpty)
-                              Text(
+                              TranslatedText(
                                 body,
                                 style: const TextStyle(color: Colors.black87),
                               ),
-                            Text(
+                            TranslatedText(
                               _formatTime(timestamp),
                               style: const TextStyle(color: Colors.grey, fontSize: 12),
                             ),

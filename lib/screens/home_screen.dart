@@ -271,7 +271,7 @@ class _StatusItem extends StatelessWidget {
         Icon(icon, size: 36, color: color),
         const SizedBox(height: 4),
         TranslatedText(label),
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+        TranslatedText(value, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
       ],
     );
   }

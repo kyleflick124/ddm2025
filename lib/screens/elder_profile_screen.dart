@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/locale_provider.dart';
+import 'package:elder_monitor/providers/locale_provider.dart';
 
 class ElderProfileScreen extends ConsumerStatefulWidget {
   const ElderProfileScreen({super.key});
@@ -175,7 +176,7 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
             ElevatedButton(
               onPressed: _isEditing ? _saveElderData : () => setState(() => _isEditing = true),
               style: ElevatedButton.styleFrom(backgroundColor: buttonColor),
-              child: Text(_isEditing ? 'Salvar seus dados' : 'Editar seus dados',
+              child: TranslatedText(_isEditing ? 'Salvar seus dados' : 'Editar seus dados',
                   style: TextStyle(color: Colors.black)),
             ),
             const SizedBox(height: 24),
@@ -192,7 +193,7 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
                   color: isDark ? (Colors.grey[850]!) : Colors.grey.shade400,
                   child: ListTile(
                     title: Text(caregiver['name'] ?? '', style: TextStyle(color: textColor)),
-                    subtitle: Text(
+                    subtitle: TranslatedText(
                         '${caregiver['email'] ?? ''} | ${caregiver['phone'] ?? ''}',
                         style: TextStyle(color: textColor)),
                     trailing: IconButton(
@@ -239,12 +240,19 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
       enabled: enabled,
       style: TextStyle(color: textColor),
       decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: textColor),
+        label: TranslatedText(
+          labelKey,
+          style: TextStyle(color: textColor),
+        ),
         filled: true,
         fillColor: cardColor,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 8,
+        ),
       ),
     );
   }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../providers/theme_provider.dart';
 import '../providers/locale_provider.dart';
+import '../providers/session_provider.dart';
 import '../services/translation_service.dart';
 import '../providers/session_provider.dart';
 
@@ -36,16 +38,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
+
     await prefs.setBool('notifications', _notificationsEnabledTemp);
     await prefs.setBool('darkTheme', _darkThemeTemp);
     await prefs.setString('last_language', _selectedLanguage);
 
-    // Update theme provider
+    // Tema
     ref.read(themeProvider.notifier).state =
         _darkThemeTemp ? ThemeMode.dark : ThemeMode.light;
 
+    // Idioma (pega do provider, NÃO sobrescreve)
+    final currentLanguage = ref.read(localeProvider).languageCode;
+    await prefs.setString('last_language', currentLanguage);
+
+    // Session provider
+    ref.read(sessionProvider.notifier).saveLastLanguage(currentLanguage);
+
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: TranslatedText('Configurações salvas!')),
+      const SnackBar(
+        content: TranslatedText('Configurações salvas!'),
+      ),
     );
 
     // Atualiza provider de idioma
@@ -59,13 +73,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final translationService = ref.watch(translationServiceProvider);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const TranslatedText('Configurações'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+          onPressed: () =>
+              Navigator.pushReplacementNamed(context, '/home'),
         ),
       ),
       body: Padding(
@@ -73,7 +88,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Language Selector
+            // ======================
+            // IDIOMA
+            // ======================
             Card(
               elevation: 2,
               shape: RoundedRectangleBorder(
@@ -110,7 +127,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             children: [
                               _getFlagEmoji(code),
                               const SizedBox(width: 12),
-                              Text(translationService.getLanguageName(code)),
+                              Text(
+                                translationService.getLanguageName(code),
+                              ),
                             ],
                           ),
                         );
@@ -127,10 +146,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
-            // Theme and Notifications
+
+            // ======================
+            // TEMA & NOTIFICAÇÕES
+            // ======================
             Card(
               elevation: 2,
               shape: RoundedRectangleBorder(
@@ -148,20 +169,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ),
                     secondary: Icon(
-                      _darkThemeTemp ? Icons.dark_mode : Icons.light_mode,
-                      color: _darkThemeTemp ? Colors.amber : Colors.grey,
+                      _darkThemeTemp
+                          ? Icons.dark_mode
+                          : Icons.light_mode,
+                      color:
+                          _darkThemeTemp ? Colors.amber : Colors.grey,
                     ),
                     value: _darkThemeTemp,
-                    onChanged: (val) {
-                      setState(() => _darkThemeTemp = val);
-                    },
+                    onChanged: (val) =>
+                        setState(() => _darkThemeTemp = val),
                   ),
                   const Divider(height: 1),
                   SwitchListTile(
-                    title: const TranslatedText('Notificações ativadas'),
+                    title: const TranslatedText(
+                        'Notificações ativadas'),
                     subtitle: TranslatedText(
-                      _notificationsEnabledTemp 
-                          ? 'Recebendo alertas' 
+                      _notificationsEnabledTemp
+                          ? 'Recebendo alertas'
                           : 'Alertas desativados',
                       style: TextStyle(
                         color: Colors.grey[600],
@@ -169,38 +193,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ),
                     secondary: Icon(
-                      _notificationsEnabledTemp 
-                          ? Icons.notifications_active 
+                      _notificationsEnabledTemp
+                          ? Icons.notifications_active
                           : Icons.notifications_off,
-                      color: _notificationsEnabledTemp ? Colors.blue : Colors.grey,
+                      color: _notificationsEnabledTemp
+                          ? Colors.blue
+                          : Colors.grey,
                     ),
                     value: _notificationsEnabledTemp,
-                    onChanged: (val) => setState(() => _notificationsEnabledTemp = val),
+                    onChanged: (val) => setState(
+                        () => _notificationsEnabledTemp = val),
                   ),
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             ElevatedButton.icon(
               onPressed: _saveSettings,
               icon: const Icon(Icons.save),
-              label: const TranslatedText('Salvar configurações'),
+              label:
+                  const TranslatedText('Salvar configurações'),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
-            // App info
+
+            // ======================
+            // INFO
+            // ======================
             Card(
               elevation: 1,
-              color: Theme.of(context).colorScheme.surfaceVariant,
+              color:
+                  Theme.of(context).colorScheme.surfaceVariant,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -216,7 +248,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ),
                     SizedBox(height: 4),
-                    Text(
+                    TranslatedText(
                       'Versão 1.0.0',
                       style: TextStyle(fontSize: 12),
                     ),

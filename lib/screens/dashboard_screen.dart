@@ -201,7 +201,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 children: [
                                   Icon(item.icon, color: item.color, size: 26),
                                   const SizedBox(height: 6),
-                                  Text(
+                                  TranslatedText(
                                     item.value,
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
@@ -235,7 +235,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               const TranslatedText('Último Check-in'),
-                              Text(
+                              TranslatedText(
                                 _formatLastSync(),
                                 style: const TextStyle(color: Colors.grey),
                               ),
@@ -254,7 +254,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                     size: 20,
                                   ),
                                   const SizedBox(width: 4),
-                                  Text(
+                                  TranslatedText(
                                     '$batteryLevel%',
                                     style: TextStyle(
                                       color: batteryLevel > 20 ? Colors.green : Colors.red,
@@ -291,7 +291,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             if (_heartRateHistory.isNotEmpty)
-              Text(
+              TranslatedText(
                 '${_heartRateHistory.length} registros',
                 style: const TextStyle(color: Colors.grey, fontSize: 12),
               ),
@@ -346,7 +346,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       color: _getHeartRateColor(_heartRateHistory[_touchedIndex!]['heartRate'] as int),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
+                    child: TranslatedText(
                       '${_heartRateHistory[_touchedIndex!]['heartRate']} bpm - ${_formatChartTime(_heartRateHistory[_touchedIndex!]['timestamp'] as String)}',
                       style: const TextStyle(
                         color: Colors.white,
@@ -390,13 +390,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 final timestamp = _heartRateHistory[index]['timestamp'] as String;
                                 return Transform.rotate(
                                   angle: -0.5,
-                                  child: Text(
+                                  child: TranslatedText(
                                     _formatChartTimeShort(timestamp),
                                     style: const TextStyle(fontSize: 9),
                                   ),
                                 );
                               }
-                              return const Text('');
+                              return const TranslatedText('');
                             },
                           ),
                         ),
@@ -406,7 +406,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             reservedSize: 40,
                             interval: 20,
                             getTitlesWidget: (value, meta) {
-                              return Text(
+                              return TranslatedText(
                                 '${value.toInt()}',
                                 style: TextStyle(
                                   fontSize: 10,
@@ -563,7 +563,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
         ),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 12)),
+        TranslatedText(label, style: const TextStyle(fontSize: 12)),
       ],
     );
   }

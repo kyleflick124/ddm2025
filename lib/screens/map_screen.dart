@@ -320,7 +320,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           'Raio da área segura:',
                           style: TextStyle(fontWeight: FontWeight.w500),
                         ),
-                        Text(
+                        TranslatedText(
                           '${_safeRadius.toInt()} m',
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: theme.colorScheme.primary,

@@ -3,6 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/firebase_sync_service.dart';
 import '../providers/locale_provider.dart';
+import 'dart:convert';
+import 'dart:math';
+import 'dart:async';
+import 'package:elder_monitor/providers/locale_provider.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../providers/theme_provider.dart';
 
 class ElderHomeScreen extends ConsumerStatefulWidget {
   const ElderHomeScreen({super.key});
