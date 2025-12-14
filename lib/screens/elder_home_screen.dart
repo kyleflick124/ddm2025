@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'dart:async';
+import 'package:elder_monitor/providers/locale_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -108,7 +109,7 @@ class _ElderHomeScreenState extends ConsumerState<ElderHomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Monitoramento de Idosos'),
+        title: const TranslatedText('Monitoramento de Idosos'),
         actions: [
           IconButton(
             icon: const Icon(Icons.person),
@@ -150,7 +151,7 @@ class _ElderHomeScreenState extends ConsumerState<ElderHomeScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    Text(
+                    TranslatedText(
                       'Resumo do Idoso Monitorado',
                       style: TextStyle(
                         fontSize: 18,
@@ -195,13 +196,13 @@ class _ElderHomeScreenState extends ConsumerState<ElderHomeScreen> {
                       color: progressColor,
                     ),
                     const SizedBox(height: 8),
-                    Text(
+                    TranslatedText(
                       'Próxima atualização em $_updateInterval s',
                       style: TextStyle(
                           fontSize: 12,
                           color: cardTextColor.withOpacity(0.6)),
                     ),
-                    Text(
+                    TranslatedText(
                       _timeSinceUpdate(),
                       style: TextStyle(
                           fontSize: 12,
@@ -215,7 +216,7 @@ class _ElderHomeScreenState extends ConsumerState<ElderHomeScreen> {
                       ),
                       onPressed: _refreshStatus,
                       icon: const Icon(Icons.refresh),
-                      label: const Text('Atualizar agora'),
+                      label: const TranslatedText('Atualizar agora'),
                     ),
                   ],
                 ),
@@ -303,8 +304,8 @@ class _StatusItem extends StatelessWidget {
       children: [
         Icon(icon, size: 36, color: color),
         const SizedBox(height: 4),
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+        TranslatedText(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+        TranslatedText(value, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
       ],
     );
   }
@@ -366,7 +367,7 @@ class _HoverAnimatedButtonState extends State<_HoverAnimatedButton> {
                   children: [
                     Icon(widget.icon, size: 40, color: widget.iconColor),
                     const SizedBox(height: 10),
-                    Text(
+                    TranslatedText(
                       widget.label,
                       style: TextStyle(
                           fontWeight: FontWeight.w600, color: widget.iconColor),
@@ -385,7 +386,7 @@ class _HoverAnimatedButtonState extends State<_HoverAnimatedButton> {
                       color: Colors.redAccent,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Text(
+                    child: TranslatedText(
                       widget.badgeCount.toString(),
                       style: const TextStyle(
                         color: Colors.white,

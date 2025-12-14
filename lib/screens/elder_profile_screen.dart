@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:elder_monitor/providers/locale_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -48,7 +49,7 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
     await prefs.setString('elder_email', _emailController.text);
     setState(() => _isEditing = false);
     ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Dados salvos!')));
+        .showSnackBar(const SnackBar(content: TranslatedText('Dados salvos!')));
   }
 
   Future<void> _loadCaregivers() async {
@@ -133,7 +134,7 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Perfil / Família'),
+        title: const TranslatedText('Perfil / Família'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pushReplacementNamed(context, '/elder_home'),
@@ -174,11 +175,11 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
             ElevatedButton(
               onPressed: _isEditing ? _saveElderData : () => setState(() => _isEditing = true),
               style: ElevatedButton.styleFrom(backgroundColor: buttonColor),
-              child: Text(_isEditing ? 'Salvar seus dados' : 'Editar seus dados',
+              child: TranslatedText(_isEditing ? 'Salvar seus dados' : 'Editar seus dados',
                   style: TextStyle(color: Colors.black)),
             ),
             const SizedBox(height: 24),
-            Text('Cuidadores cadastrados',
+            TranslatedText('Cuidadores cadastrados',
                 style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
             const SizedBox(height: 12),
             ListView.builder(
@@ -191,7 +192,7 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
                   color: isDark ? (Colors.grey[850]!) : Colors.grey.shade400,
                   child: ListTile(
                     title: Text(caregiver['name'] ?? '', style: TextStyle(color: textColor)),
-                    subtitle: Text(
+                    subtitle: TranslatedText(
                         '${caregiver['email'] ?? ''} | ${caregiver['phone'] ?? ''}',
                         style: TextStyle(color: textColor)),
                     trailing: IconButton(
@@ -203,7 +204,7 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
               },
             ),
             const SizedBox(height: 12),
-            Text('Adicionar cuidador',
+            TranslatedText('Adicionar cuidador',
                 style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
             const SizedBox(height: 8),
             _buildTextField("Nome completo", _caregiverNameController,
@@ -222,7 +223,7 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
             ElevatedButton(
               onPressed: _addCaregiver,
               style: ElevatedButton.styleFrom(backgroundColor: buttonColor),
-              child: const Text('Adicionar', style: TextStyle(color: Colors.black)),
+              child: const TranslatedText('Adicionar', style: TextStyle(color: Colors.black)),
             ),
           ],
         ),
@@ -230,20 +231,33 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller,
-      {TextInputType? keyboardType, bool enabled = true, required Color textColor, required Color cardColor}) {
+  Widget _buildTextField(
+    String labelKey,
+    TextEditingController controller, {
+    TextInputType? keyboardType,
+    bool enabled = true,
+    required Color textColor,
+    required Color cardColor,
+  }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
       enabled: enabled,
       style: TextStyle(color: textColor),
       decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: textColor),
+        label: TranslatedText(
+          labelKey,
+          style: TextStyle(color: textColor),
+        ),
         filled: true,
         fillColor: cardColor,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 8,
+        ),
       ),
     );
   }

@@ -209,7 +209,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Área segura definida na posição atual!'),
+        content: TranslatedText('Área segura definida na posição atual!'),
         backgroundColor: Colors.green,
       ),
     );
@@ -319,7 +319,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           'Raio da área segura:',
                           style: TextStyle(fontWeight: FontWeight.w500),
                         ),
-                        Text(
+                        TranslatedText(
                           '${_safeRadius.toInt()} m',
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: theme.colorScheme.primary,
