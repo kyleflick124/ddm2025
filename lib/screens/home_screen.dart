@@ -45,15 +45,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return alerts.where((a) => !a['read']).length;
   }
 
-  void _refreshStatus() {
+  void _refreshStatus() async {
     final rand = Random();
+    final newHeartRate = 60 + rand.nextInt(60); // 60–120 bpm
+    final newSpo2 = 90 + rand.nextInt(10); // 90–99%
+    final newInsideGeofence = rand.nextBool();
+    final newLastUpdate = DateTime.now();
+
     setState(() {
-      heartRate = 60 + rand.nextInt(60); // 60–120 bpm
-      spo2 = 90 + rand.nextInt(10); // 90–99%
-      insideGeofence = rand.nextBool();
-      lastUpdate = DateTime.now();
+      heartRate = newHeartRate;
+      spo2 = newSpo2;
+      insideGeofence = newInsideGeofence;
+      lastUpdate = newLastUpdate;
       _progress = 0.0;
     });
+
+    // Save to SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('heart_rate', newHeartRate);
+    await prefs.setInt('spo2', newSpo2);
+    await prefs.setBool('inside_geofence', newInsideGeofence);
+    await prefs.setString('last_update', newLastUpdate.toIso8601String());
   }
 
   void _startAutoUpdate() {
@@ -85,8 +97,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _refreshStatus();
+    _loadSessionData();
     _startAutoUpdate();
+  }
+
+  Future<void> _loadSessionData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      heartRate = prefs.getInt('heart_rate') ?? 78;
+      spo2 = prefs.getInt('spo2') ?? 96;
+      insideGeofence = prefs.getBool('inside_geofence') ?? true;
+      final lastUpdateStr = prefs.getString('last_update');
+      if (lastUpdateStr != null) {
+        lastUpdate = DateTime.tryParse(lastUpdateStr) ?? DateTime.now();
+      }
+    });
   }
 
   @override
@@ -198,14 +223,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     Text(
                       'Próxima atualização em $_updateInterval s',
                       style: TextStyle(
-                          fontSize: 12,
-                          color: cardTextColor.withOpacity(0.6)),
+                          fontSize: 12, color: cardTextColor.withOpacity(0.6)),
                     ),
                     Text(
                       _timeSinceUpdate(),
                       style: TextStyle(
-                          fontSize: 12,
-                          color: cardTextColor.withOpacity(0.6)),
+                          fontSize: 12, color: cardTextColor.withOpacity(0.6)),
                     ),
                     const SizedBox(height: 8),
                     ElevatedButton.icon(
@@ -249,8 +272,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         final unread = snapshot.data ?? 0;
                         final hasUnread = unread > 0;
                         return _HoverAnimatedButton(
-                          color:
-                              hasUnread ? Colors.red.shade100 : baseColor,
+                          color: hasUnread ? Colors.red.shade100 : baseColor,
                           hoverColor:
                               hasUnread ? Colors.red.shade200 : hoverColor,
                           iconColor: hasUnread ? Colors.redAccent : iconColor,
@@ -304,7 +326,8 @@ class _StatusItem extends StatelessWidget {
         Icon(icon, size: 36, color: color),
         const SizedBox(height: 4),
         Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+        Text(value,
+            style: TextStyle(fontWeight: FontWeight.bold, color: color)),
       ],
     );
   }

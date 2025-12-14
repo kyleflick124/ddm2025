@@ -19,6 +19,8 @@ import 'screens/settings_screen.dart';
 import 'screens/elder_home_screen.dart';
 import 'screens/elder_profile_screen.dart';
 import 'providers/theme_provider.dart';
+import 'providers/locale_provider.dart';
+import 'providers/session_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,8 +39,11 @@ class ElderMonitorApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeProvider);
+    final locale = ref.watch(localeProvider);
+    final session = ref.watch(sessionProvider);
 
     return MaterialApp(
+      navigatorObservers: [RouteObserver(ref)],
       title: 'Elder Monitor',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -75,6 +80,8 @@ class ElderMonitorApp extends ConsumerWidget {
       // mantém sua lógica atual
       initialRoute: _getInitialRoute(),
 
+      locale: locale,
+      initialRoute: session.lastRoute ?? '/splash',
       supportedLocales: const [
         Locale('en'),
         Locale('pt'),
@@ -106,5 +113,27 @@ class ElderMonitorApp extends ConsumerWidget {
   String _getInitialRoute() {
     final user = FirebaseAuth.instance.currentUser;
     return user != null ? '/home' : '/login';
+  }
+}
+
+class RouteObserver extends NavigatorObserver {
+  final WidgetRef ref;
+  RouteObserver(this.ref);
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    if (route.settings.name != null && route.settings.name != '/splash') {
+      ref.read(sessionProvider.notifier).saveLastRoute(route.settings.name!);
+    }
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    if (newRoute?.settings.name != null &&
+        newRoute!.settings.name != '/splash') {
+      ref.read(sessionProvider.notifier).saveLastRoute(newRoute.settings.name!);
+    }
   }
 }
