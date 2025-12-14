@@ -7,6 +7,7 @@ import '../models/location_data.dart';
 import '../services/firebase_sync_service.dart';
 import '../providers/geofence_provider.dart';
 import '../providers/locale_provider.dart';
+import '../providers/elder_provider.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -24,8 +25,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Timer? _updateTimer;
   StreamSubscription? _locationSubscription;
   
-  // Elder ID for Firebase sync (would come from auth/selected elder)
-  final String _elderId = 'elder_demo';
+  // Elder ID from provider (dynamic based on selection)
+  String get _elderId => ref.read(activeElderIdProvider) ?? 'elder_demo';
   
   // Firebase sync service
   final FirebaseSyncService _syncService = FirebaseSyncService();
@@ -209,7 +210,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Área segura definida na posição atual!'),
+        content: TranslatedText('Área segura definida na posição atual!'),
         backgroundColor: Colors.green,
       ),
     );
@@ -334,12 +335,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       max: 500,
                       divisions: 48,
                       label: '${_safeRadius.toInt()} m',
-                      onChanged: (value) {
+                      onChanged: (val) {
                         setState(() {
-                          _safeRadius = value;
+                          _safeRadius = val;
                           if (_safeCenter != null) {
-                            final distance = _calculateDistance(
-                              _currentPosition, _safeCenter!);
+                            final distance =
+                                _calculateDistance(_currentPosition, _safeCenter!);
                             _isOutOfBounds = distance > _safeRadius;
                           }
                         });

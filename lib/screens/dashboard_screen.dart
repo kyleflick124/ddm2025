@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/locale_provider.dart';
+import '../providers/elder_provider.dart';
 import '../models/health_data.dart';
 import '../services/firebase_sync_service.dart';
 import 'dart:async';
@@ -20,7 +21,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   bool _isLoading = true;
   int? _touchedIndex;
   
-  final String _elderId = 'elder_demo';
+  String get _elderId => ref.read(activeElderIdProvider) ?? 'elder_demo';
   final FirebaseSyncService _syncService = FirebaseSyncService();
   StreamSubscription? _healthSubscription;
   StreamSubscription? _deviceSubscription;

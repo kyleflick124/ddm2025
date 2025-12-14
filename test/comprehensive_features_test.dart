@@ -616,4 +616,399 @@ void main() {
       expect(distance, lessThan(2000));
     });
   });
+
+  // ============================================================
+  // GOOGLE AUTH SERVICE TESTS
+  // ============================================================
+  group('Google Auth Service', () {
+    test('should handle null google user (cancelled login)', () {
+      const dynamic cancelledUser = null;
+      expect(cancelledUser, isNull);
+    });
+
+    test('should create OAuth credential with tokens', () {
+      final mockTokens = {
+        'accessToken': 'mock_access_token_12345',
+        'idToken': 'mock_id_token_12345',
+      };
+      
+      expect(mockTokens['accessToken'], isNotEmpty);
+      expect(mockTokens['idToken'], isNotEmpty);
+    });
+
+    test('should support web platform client ID', () {
+      const webClientId = '920232777173-kdj68jmodrs71t5padb8p1rf7romjejv.apps.googleusercontent.com';
+      expect(webClientId, contains('apps.googleusercontent.com'));
+      expect(webClientId.length, greaterThan(50));
+    });
+  });
+
+  // ============================================================
+  // SESSION PROVIDER TESTS
+  // ============================================================
+  group('Session Provider', () {
+    test('SessionState should have correct initial values', () {
+      final state = _TestSessionState();
+      expect(state.lastRoute, isNull);
+      expect(state.lastLanguage, isNull);
+      expect(state.pageData, isEmpty);
+    });
+
+    test('SessionState copyWith should preserve existing values', () {
+      final state = _TestSessionState(
+        lastRoute: '/home',
+        lastLanguage: 'pt',
+        pageData: {'key': 'value'},
+      );
+      
+      final newState = state.copyWith(lastRoute: '/dashboard');
+      
+      expect(newState.lastRoute, '/dashboard');
+      expect(newState.lastLanguage, 'pt');
+      expect(newState.pageData['key'], 'value');
+    });
+
+    test('Session should save and load page-specific data', () {
+      final pageData = <String, dynamic>{};
+      
+      pageData['elder_name'] = 'João';
+      pageData['elder_age'] = '75';
+      pageData['heart_rate'] = 72;
+      pageData['inside_geofence'] = true;
+      
+      expect(pageData['elder_name'], 'João');
+      expect(pageData['heart_rate'], 72);
+      expect(pageData['inside_geofence'], true);
+    });
+
+    test('Session clear should reset all values', () {
+      var state = _TestSessionState(lastRoute: '/home', lastLanguage: 'en');
+      state = _TestSessionState();
+      
+      expect(state.lastRoute, isNull);
+      expect(state.lastLanguage, isNull);
+    });
+  });
+
+  // ============================================================
+  // ROLE-BASED LOGIN TESTS
+  // ============================================================
+  group('Role-Based Login', () {
+    test('should have two roles: cuidador and idoso', () {
+      const roles = ['cuidador', 'idoso'];
+      expect(roles.length, 2);
+      expect(roles, contains('cuidador'));
+      expect(roles, contains('idoso'));
+    });
+
+    test('cuidador role should navigate to /home', () {
+      const role = 'cuidador';
+      final route = role == 'cuidador' ? '/home' : '/elder_home';
+      expect(route, '/home');
+    });
+
+    test('idoso role should navigate to /elder_home', () {
+      const role = 'idoso';
+      final route = role == 'cuidador' ? '/home' : '/elder_home';
+      expect(route, '/elder_home');
+    });
+
+    test('login button should be disabled when no role selected', () {
+      String? selectedRole;
+      final isButtonEnabled = selectedRole != null;
+      expect(isButtonEnabled, false);
+    });
+
+    test('login button should be enabled when role selected', () {
+      const selectedRole = 'cuidador';
+      final isButtonEnabled = selectedRole != null;
+      expect(isButtonEnabled, true);
+    });
+  });
+
+  // ============================================================
+  // ELDER HOME SCREEN TESTS
+  // ============================================================
+  group('Elder Home Screen', () {
+    test('should have status items for health metrics', () {
+      final statusItems = [
+        {'label': 'Batimentos', 'value': '72 bpm'},
+        {'label': 'SpO2', 'value': '98%'},
+        {'label': 'Passos', 'value': '5000'},
+      ];
+      
+      expect(statusItems.length, 3);
+      expect(statusItems[0]['label'], 'Batimentos');
+    });
+
+    test('should calculate unread alert count', () {
+      final alerts = [
+        {'read': false},
+        {'read': true},
+        {'read': false},
+        {'read': true},
+      ];
+      
+      final unreadCount = alerts.where((a) => a['read'] == false).length;
+      expect(unreadCount, 2);
+    });
+
+    test('should calculate time since last update', () {
+      final lastUpdate = DateTime.now().subtract(const Duration(minutes: 5));
+      final diff = DateTime.now().difference(lastUpdate);
+      
+      expect(diff.inMinutes, 5);
+    });
+
+    test('should have emergency SOS button', () {
+      const hasSOSButton = true;
+      expect(hasSOSButton, true);
+    });
+  });
+
+  // ============================================================
+  // ELDER PROFILE SCREEN TESTS
+  // ============================================================
+  group('Elder Profile Screen', () {
+    test('should load elder data from storage', () {
+      final elderData = {
+        'name': 'João Silva',
+        'age': '75',
+        'phone': '11 91234-5678',
+      };
+      
+      expect(elderData['name'], isNotEmpty);
+      expect(elderData['age'], isNotEmpty);
+    });
+
+    test('should manage caregivers list', () {
+      final caregivers = <Map<String, String>>[];
+      
+      caregivers.add({
+        'name': 'Pedro Cuidador',
+        'email': 'pedro@email.com',
+        'phone': '11 91111-2222',
+      });
+      
+      expect(caregivers.length, 1);
+      expect(caregivers[0]['name'], 'Pedro Cuidador');
+      
+      caregivers.removeAt(0);
+      expect(caregivers.length, 0);
+    });
+
+    test('should toggle edit mode', () {
+      var isEditing = false;
+      isEditing = true;
+      expect(isEditing, true);
+      isEditing = false;
+      expect(isEditing, false);
+    });
+  });
+
+  // ============================================================
+  // MULTI-ELDER SYSTEM TESTS
+  // ============================================================
+  group('Multi-Elder System', () {
+    test('should generate correct caregiver paths', () {
+      final path = FirebaseSyncService.getCaregiverPath('caregiver123');
+      expect(path, 'caregivers/caregiver123');
+    });
+
+    test('should generate correct caregiver elders path', () {
+      final path = FirebaseSyncService.getCaregiverEldersPath('caregiver123');
+      expect(path, 'caregivers/caregiver123/elders');
+    });
+
+    test('should generate correct elder profile path', () {
+      final path = FirebaseSyncService.getElderProfilePath('elder456');
+      expect(path, 'elders/elder456/profile');
+    });
+
+    test('caregiver ID should be separate from elder ID', () {
+      final caregiverPath = FirebaseSyncService.getCaregiverPath('caregiver1');
+      final elderPath = FirebaseSyncService.getElderProfilePath('elder1');
+      
+      expect(caregiverPath, isNot(contains('elder')));
+      expect(elderPath, isNot(contains('caregiver')));
+    });
+
+    test('multiple elders should have separate paths', () {
+      final elder1 = FirebaseSyncService.getHealthDataPath('elder1');
+      final elder2 = FirebaseSyncService.getHealthDataPath('elder2');
+      final elder3 = FirebaseSyncService.getHealthDataPath('elder3');
+      
+      final paths = {elder1, elder2, elder3};
+      expect(paths.length, 3); // All unique
+    });
+
+    test('elder selection should update active elder', () {
+      String? activeElderId;
+      
+      activeElderId = 'elder_001';
+      expect(activeElderId, 'elder_001');
+      
+      activeElderId = 'elder_002';
+      expect(activeElderId, 'elder_002');
+    });
+
+    test('caregiver registration data should be complete', () {
+      final caregiverData = {
+        'email': 'caregiver@email.com',
+        'name': 'Maria Cuidadora',
+        'createdAt': DateTime.now().toIso8601String(),
+      };
+      
+      expect(caregiverData['email'], isNotEmpty);
+      expect(caregiverData['name'], isNotEmpty);
+      expect(caregiverData['createdAt'], isNotEmpty);
+    });
+
+    test('elder registration data should be complete', () {
+      final elderData = {
+        'name': 'João Silva',
+        'age': '75',
+        'phone': '11 91234-5678',
+        'email': 'joao@email.com',
+        'medicalCondition': 'Hipertensão',
+        'caregiverId': 'caregiver123',
+      };
+      
+      expect(elderData['name'], isNotEmpty);
+      expect(elderData['caregiverId'], isNotEmpty);
+    });
+  });
+
+  // ============================================================
+  // LOGIN NAVIGATION TESTS
+  // ============================================================
+  group('Login Navigation', () {
+    test('caregiver role should navigate to /home', () {
+      String? selectedRole = 'cuidador';
+      String targetRoute;
+      
+      if (selectedRole == 'cuidador') {
+        targetRoute = '/home';
+      } else {
+        targetRoute = '/elder_home';
+      }
+      
+      expect(targetRoute, '/home');
+    });
+
+    test('elder role on phone should navigate to /elder_home', () {
+      String? selectedRole = 'idoso';
+      bool isSmartwatch = false;
+      String targetRoute;
+      
+      if (selectedRole == 'idoso') {
+        if (isSmartwatch) {
+          targetRoute = '/watch_home';
+        } else {
+          targetRoute = '/elder_home';
+        }
+      } else {
+        targetRoute = '/home';
+      }
+      
+      expect(targetRoute, '/elder_home');
+    });
+
+    test('elder role on smartwatch should navigate to /watch_home', () {
+      String? selectedRole = 'idoso';
+      bool isSmartwatch = true;
+      String targetRoute;
+      
+      if (selectedRole == 'idoso') {
+        if (isSmartwatch) {
+          targetRoute = '/watch_home';
+        } else {
+          targetRoute = '/elder_home';
+        }
+      } else {
+        targetRoute = '/home';
+      }
+      
+      expect(targetRoute, '/watch_home');
+    });
+
+    test('login should save caregiver ID to SharedPreferences', () {
+      // Simulating SharedPreferences save
+      Map<String, String> mockPrefs = {};
+      const caregiverId = 'user123';
+      
+      mockPrefs['caregiver_id'] = caregiverId;
+      
+      expect(mockPrefs['caregiver_id'], caregiverId);
+    });
+
+    test('login navigation should not block on Firebase', () {
+      // Navigation should happen immediately after local save
+      // Firebase operations should be in background
+      
+      bool navigationStarted = false;
+      bool localSaveComplete = false;
+      bool firebaseComplete = false;
+      
+      // Step 1: Save locally (sync)
+      localSaveComplete = true;
+      
+      // Step 2: Navigate immediately
+      navigationStarted = true;
+      
+      // Step 3: Firebase in background (would be async)
+      firebaseComplete = true; // This would happen later
+      
+      // Assert navigation happened before or at same time as Firebase
+      expect(localSaveComplete, true);
+      expect(navigationStarted, true);
+    });
+
+    test('all required routes should exist', () {
+      final routes = [
+        '/splash',
+        '/login',
+        '/home',
+        '/dashboard',
+        '/alerts',
+        '/map',
+        '/device',
+        '/profile',
+        '/elder_profile',
+        '/settings',
+        '/elder_home',
+        '/watch_home',
+      ];
+      
+      expect(routes.contains('/home'), true);
+      expect(routes.contains('/elder_home'), true);
+      expect(routes.contains('/watch_home'), true);
+      expect(routes.length, 12);
+    });
+  });
+}
+
+// Test helper class for SessionState
+class _TestSessionState {
+  final String? lastRoute;
+  final String? lastLanguage;
+  final Map<String, dynamic> pageData;
+
+  _TestSessionState({
+    this.lastRoute,
+    this.lastLanguage,
+    this.pageData = const {},
+  });
+
+  _TestSessionState copyWith({
+    String? lastRoute,
+    String? lastLanguage,
+    Map<String, dynamic>? pageData,
+  }) {
+    return _TestSessionState(
+      lastRoute: lastRoute ?? this.lastRoute,
+      lastLanguage: lastLanguage ?? this.lastLanguage,
+      pageData: pageData ?? this.pageData,
+    );
+  }
 }

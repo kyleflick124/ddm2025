@@ -1,20 +1,22 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/firebase_sync_service.dart';
 import '../providers/locale_provider.dart';
+import '../providers/elder_provider.dart';
 
-class AlertsScreen extends StatefulWidget {
+class AlertsScreen extends ConsumerStatefulWidget {
   const AlertsScreen({super.key});
 
   @override
-  State<AlertsScreen> createState() => _AlertsScreenState();
+  ConsumerState<AlertsScreen> createState() => _AlertsScreenState();
 }
 
-class _AlertsScreenState extends State<AlertsScreen> {
+class _AlertsScreenState extends ConsumerState<AlertsScreen> {
   List<Map<String, dynamic>> alerts = [];
   bool _isLoading = true;
 
-  final String _elderId = 'elder_demo';
+  String get _elderId => ref.read(activeElderIdProvider) ?? 'elder_demo';
   final FirebaseSyncService _syncService = FirebaseSyncService();
   StreamSubscription? _alertsSubscription;
 
@@ -83,7 +85,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
         ),
-        title: const Text('Alertas'),
+        title: const TranslatedText('Alertas'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

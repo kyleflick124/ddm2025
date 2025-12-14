@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/theme_provider.dart';
 import '../providers/locale_provider.dart';
 import '../services/translation_service.dart';
+import '../providers/session_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -15,6 +16,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _notificationsEnabledTemp = true;
   bool _darkThemeTemp = false;
+  String _selectedLanguage = 'pt';
 
   @override
   void initState() {
@@ -28,6 +30,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() {
       _notificationsEnabledTemp = prefs.getBool('notifications') ?? true;
       _darkThemeTemp = prefs.getBool('darkTheme') ?? false;
+      _selectedLanguage = prefs.getString('last_language') ?? 'pt';
     });
   }
 
@@ -35,6 +38,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('notifications', _notificationsEnabledTemp);
     await prefs.setBool('darkTheme', _darkThemeTemp);
+    await prefs.setString('last_language', _selectedLanguage);
 
     // Update theme provider
     ref.read(themeProvider.notifier).state =
@@ -43,11 +47,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: TranslatedText('Configurações salvas!')),
     );
+
+    // Atualiza provider de idioma
+    ref.read(localeProvider.notifier).state = Locale(_selectedLanguage);
+
+    // Salva no session provider
+    ref.read(sessionProvider.notifier).saveLastLanguage(_selectedLanguage);
+
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentLocale = ref.watch(localeProvider);
     final translationService = ref.watch(translationServiceProvider);
     
     return Scaffold(
@@ -83,7 +93,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: currentLocale.languageCode,
+                      value: _selectedLanguage,
                       decoration: InputDecoration(
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -107,7 +117,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       }).toList(),
                       onChanged: (code) {
                         if (code != null) {
-                          ref.read(localeProvider.notifier).setLocale(code);
+                          setState(() {
+                            _selectedLanguage = code;
+                          });
                         }
                       },
                     ),
