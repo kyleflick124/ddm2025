@@ -77,9 +77,6 @@ class ElderMonitorApp extends ConsumerWidget {
       ),
       themeMode: themeMode,
 
-      // mantém sua lógica atual
-      initialRoute: _getInitialRoute(),
-
       locale: locale,
       initialRoute: session.lastRoute ?? '/splash',
       supportedLocales: const [
