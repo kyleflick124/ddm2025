@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'firebase_options.dart'; // 🔥 ADICIONADO
 
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
@@ -12,11 +16,20 @@ import 'screens/map_screen.dart';
 import 'screens/device_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/elder_home_screen.dart';
+import 'screens/elder_profile_screen.dart';
 import 'providers/theme_provider.dart';
 import 'providers/locale_provider.dart';
 import 'providers/session_provider.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 🔥 Firebase inicializado corretamente para Web / Android / iOS
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(const ProviderScope(child: ElderMonitorApp()));
 }
 
@@ -63,6 +76,10 @@ class ElderMonitorApp extends ConsumerWidget {
         ),
       ),
       themeMode: themeMode,
+
+      // mantém sua lógica atual
+      initialRoute: _getInitialRoute(),
+
       locale: locale,
       initialRoute: session.lastRoute ?? '/splash',
       supportedLocales: const [
@@ -86,9 +103,16 @@ class ElderMonitorApp extends ConsumerWidget {
         '/map': (context) => const MapScreen(),
         '/device': (context) => const DeviceScreen(),
         '/profile': (context) => const ProfileScreen(),
+        '/elder_profile': (context) => const ElderProfileScreen(),
         '/settings': (context) => const SettingsScreen(),
+        '/elder_home': (context) => const ElderHomeScreen(),
       },
     );
+  }
+
+  String _getInitialRoute() {
+    final user = FirebaseAuth.instance.currentUser;
+    return user != null ? '/home' : '/login';
   }
 }
 

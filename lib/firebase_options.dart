@@ -63,6 +63,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '920232777173',
     projectId: 'ddm2025-fernandofelipemauricio',
     storageBucket: 'ddm2025-fernandofelipemauricio.firebasestorage.app',
+    iosClientId: '920232777173-cmpnjjctvh5cni5i7ea5iklq665qddmk.apps.googleusercontent.com',
     iosBundleId: 'com.example.t4',
   );
 
@@ -72,6 +73,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '920232777173',
     projectId: 'ddm2025-fernandofelipemauricio',
     storageBucket: 'ddm2025-fernandofelipemauricio.firebasestorage.app',
+    iosClientId: '920232777173-cmpnjjctvh5cni5i7ea5iklq665qddmk.apps.googleusercontent.com',
     iosBundleId: 'com.example.t4',
   );
 
@@ -83,4 +85,5 @@ class DefaultFirebaseOptions {
     authDomain: 'ddm2025-fernandofelipemauricio.firebaseapp.com',
     storageBucket: 'ddm2025-fernandofelipemauricio.firebasestorage.app',
   );
+
 }
