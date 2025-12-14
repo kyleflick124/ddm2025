@@ -77,7 +77,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<String>(
-                    value: selectedTitle,
+                    initialValue: selectedTitle,
                     decoration:
                         const InputDecoration(labelText: 'Tipo de alerta'),
                     items: predefinedTitles
@@ -89,7 +89,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: selectedTime,
+                    initialValue: selectedTime,
                     decoration: const InputDecoration(
                         labelText: 'Tempo desde o alerta'),
                     items: [
@@ -200,7 +200,8 @@ class _AlertsScreenState extends State<AlertsScreen> {
                   default:
                     icon = Icons.notifications_active;
                     iconColor = Colors.blueAccent;
-                    cardColor = isRead ? Colors.grey[100]! : Colors.blue.shade50;
+                    cardColor =
+                        isRead ? Colors.grey[100]! : Colors.blue.shade50;
                 }
 
                 return Card(
@@ -218,7 +219,8 @@ class _AlertsScreenState extends State<AlertsScreen> {
                     ),
                     subtitle: Text(
                       alert['time'],
-                      style: const TextStyle(color: Colors.black), // sempre preto
+                      style:
+                          const TextStyle(color: Colors.black), // sempre preto
                     ),
                     trailing: !isRead
                         ? IconButton(

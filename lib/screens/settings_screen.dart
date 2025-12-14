@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/theme_provider.dart';
+import '../providers/locale_provider.dart';
+import '../providers/session_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -13,6 +15,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _notificationsEnabledTemp = true;
   bool _darkThemeTemp = false;
+  String _selectedLanguage = 'pt';
 
   @override
   void initState() {
@@ -26,6 +29,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() {
       _notificationsEnabledTemp = prefs.getBool('notifications') ?? true;
       _darkThemeTemp = prefs.getBool('darkTheme') ?? false;
+      _selectedLanguage = prefs.getString('last_language') ?? 'pt';
     });
   }
 
@@ -33,13 +37,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('notifications', _notificationsEnabledTemp);
     await prefs.setBool('darkTheme', _darkThemeTemp);
+    await prefs.setString('last_language', _selectedLanguage);
 
-    // Atualiza provider
+    // Atualiza provider de tema
     ref.read(themeProvider.notifier).state =
         _darkThemeTemp ? ThemeMode.dark : ThemeMode.light;
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Configurações salvas!')));
+    // Atualiza provider de idioma
+    ref.read(localeProvider.notifier).state = Locale(_selectedLanguage);
+
+    // Salva no session provider
+    ref.read(sessionProvider.notifier).saveLastLanguage(_selectedLanguage);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Configurações salvas!')));
+    }
   }
 
   @override
@@ -67,7 +80,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             SwitchListTile(
               title: const Text('Notificações ativadas'),
               value: _notificationsEnabledTemp,
-              onChanged: (val) => setState(() => _notificationsEnabledTemp = val),
+              onChanged: (val) =>
+                  setState(() => _notificationsEnabledTemp = val),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              title: const Text('Idioma'),
+              subtitle: DropdownButton<String>(
+                value: _selectedLanguage,
+                isExpanded: true,
+                items: const [
+                  DropdownMenuItem(value: 'pt', child: Text('Português')),
+                  DropdownMenuItem(value: 'en', child: Text('English')),
+                  DropdownMenuItem(value: 'es', child: Text('Español')),
+                  DropdownMenuItem(value: 'fr', child: Text('Français')),
+                  DropdownMenuItem(value: 'zh', child: Text('中文')),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _selectedLanguage = val);
+                  }
+                },
+              ),
             ),
             const SizedBox(height: 24),
             ElevatedButton(
