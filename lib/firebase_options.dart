@@ -47,6 +47,7 @@ class DefaultFirebaseOptions {
     projectId: 'ddm2025-fernandofelipemauricio',
     authDomain: 'ddm2025-fernandofelipemauricio.firebaseapp.com',
     storageBucket: 'ddm2025-fernandofelipemauricio.firebasestorage.app',
+    databaseURL: 'https://ddm2025-fernandofelipemauricio-default-rtdb.firebaseio.com',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -55,6 +56,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '920232777173',
     projectId: 'ddm2025-fernandofelipemauricio',
     storageBucket: 'ddm2025-fernandofelipemauricio.firebasestorage.app',
+    databaseURL: 'https://ddm2025-fernandofelipemauricio-default-rtdb.firebaseio.com',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
@@ -64,6 +66,7 @@ class DefaultFirebaseOptions {
     projectId: 'ddm2025-fernandofelipemauricio',
     storageBucket: 'ddm2025-fernandofelipemauricio.firebasestorage.app',
     iosBundleId: 'com.example.t4',
+    databaseURL: 'https://ddm2025-fernandofelipemauricio-default-rtdb.firebaseio.com',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -73,6 +76,7 @@ class DefaultFirebaseOptions {
     projectId: 'ddm2025-fernandofelipemauricio',
     storageBucket: 'ddm2025-fernandofelipemauricio.firebasestorage.app',
     iosBundleId: 'com.example.t4',
+    databaseURL: 'https://ddm2025-fernandofelipemauricio-default-rtdb.firebaseio.com',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
@@ -82,5 +86,6 @@ class DefaultFirebaseOptions {
     projectId: 'ddm2025-fernandofelipemauricio',
     authDomain: 'ddm2025-fernandofelipemauricio.firebaseapp.com',
     storageBucket: 'ddm2025-fernandofelipemauricio.firebasestorage.app',
+    databaseURL: 'https://ddm2025-fernandofelipemauricio-default-rtdb.firebaseio.com',
   );
 }

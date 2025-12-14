@@ -60,24 +60,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       }
     });
 
-    // Fallback to default data after timeout
-    Future.delayed(const Duration(seconds: 3), () {
+    // No simulated fallback - just set loading to false
+    Future.delayed(const Duration(seconds: 5), () {
       if (_isLoading) {
         setState(() {
           _isLoading = false;
-          _healthData = HealthData(
-            heartRate: 76,
-            spo2: 98,
-            steps: 4523,
-            temperature: 36.8,
-            bloodPressure: '120/80',
-            timestamp: DateTime.now(),
-          );
-          _deviceStatus = {
-            'batteryLevel': 78,
-            'isCharging': false,
-            'lastSync': DateTime.now().toIso8601String(),
-          };
+          // No simulated data - leave as null
         });
       }
     });
@@ -85,20 +73,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final healthData = _healthData ?? HealthData(
-      heartRate: 76,
-      spo2: 98,
-      steps: 4523,
-      temperature: 36.8,
-      bloodPressure: '120/80',
-      timestamp: DateTime.now(),
-    );
+    // Check if we have real data
+    final hasData = _healthData != null;
+    final healthData = _healthData;
 
-    final batteryLevel = _deviceStatus?['batteryLevel'] ?? 78;
+    final batteryLevel = _deviceStatus?['batteryLevel'] ?? 0;
     final isCharging = _deviceStatus?['isCharging'] ?? false;
 
-    final healthItems = [
-      _HealthMetric('Batimentos', '${healthData.heartRate} bpm', Icons.favorite, 
+    // Health items only if we have data
+    final healthItems = hasData ? [
+      _HealthMetric('Batimentos', '${healthData!.heartRate} bpm', Icons.favorite, 
           healthData.isHeartRateNormal ? Colors.green : Colors.redAccent),
       _HealthMetric('Passos', '${healthData.steps}', Icons.directions_walk, Colors.blue),
       _HealthMetric('Oxigênio', '${healthData.spo2}%', Icons.air, 
@@ -108,7 +92,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       _HealthMetric('Pressão', healthData.bloodPressure, Icons.monitor_heart, Colors.purple),
       _HealthMetric('Status', healthData.isCritical ? 'Crítico' : 'Normal', Icons.watch, 
           healthData.isCritical ? Colors.red : Colors.teal),
-    ];
+    ] : <_HealthMetric>[];
 
     return Scaffold(
       appBar: AppBar(
@@ -161,6 +145,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       final itemWidth = isSmall
                           ? constraints.maxWidth / 2 - 12
                           : constraints.maxWidth / 6 - 8;
+
+                      if (healthItems.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Column(
+                            children: [
+                              Icon(Icons.watch_off, size: 48, color: Colors.grey),
+                              SizedBox(height: 8),
+                              TranslatedText(
+                                'Aguardando dados do smartwatch...',
+                                style: TextStyle(color: Colors.grey, fontSize: 16),
+                              ),
+                              SizedBox(height: 4),
+                              TranslatedText(
+                                'Os dados serão exibidos quando o relógio estiver conectado',
+                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
 
                       return Wrap(
                         alignment: WrapAlignment.spaceBetween,

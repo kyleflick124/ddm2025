@@ -313,20 +313,6 @@ ddm2025/
 
 ---
 
-## 📋 Requisitos RFP Implementados
-
-Conforme especificação UFSCar Sorocaba:
-
-- [x] **REQ-1**: Rastreamento GPS com intervalos configuráveis
-- [x] **REQ-2**: Controle remoto da taxa de atualização
-- [x] **REQ-3**: Modo de emergência com rastreamento contínuo
-- [x] **REQ-4**: Visualização em mapa com histórico
-- [x] **REQ-5**: Otimização de energia (atualizações adaptativas)
-- [x] **REQ-6**: Integração com notificações (alertas)
-- [x] **REQ-7**: Autonomia de operação (smartwatch independente)
-
----
-
 ## 👥 Equipe
 
 - Felipe Rodrigues Bastos - RA: 815406

@@ -78,20 +78,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }
     });
 
-    // Set loading to false after initial timeout
-    Future.delayed(const Duration(seconds: 3), () {
+    // Set loading to false after initial timeout - no simulated data
+    Future.delayed(const Duration(seconds: 5), () {
       if (_isLoading) {
         setState(() {
           _isLoading = false;
-          // Use default/simulated data if no Firebase data available
-          _healthData = HealthData(
-            heartRate: 76,
-            spo2: 98,
-            steps: 4523,
-            temperature: 36.8,
-            bloodPressure: '120/80',
-            timestamp: DateTime.now(),
-          );
+          // No simulated data - leave _healthData as null
         });
       }
     });
@@ -131,7 +123,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final progressColor = isDark ? Colors.tealAccent : Colors.blueAccent;
     final progressBgColor = isDark ? Colors.white12 : Colors.grey.shade300;
 
-    // Get health values (with defaults if loading)
+    // Get health values - show placeholder if no data
+    final hasData = _healthData != null;
     final heartRate = _healthData?.heartRate ?? 0;
     final spo2 = _healthData?.spo2 ?? 0;
 
@@ -193,6 +186,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       const Padding(
                         padding: EdgeInsets.all(20),
                         child: CircularProgressIndicator(),
+                      )
+                    else if (!hasData)
+                      const Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Column(
+                          children: [
+                            Icon(Icons.watch_off, size: 48, color: Colors.grey),
+                            SizedBox(height: 8),
+                            TranslatedText(
+                              'Aguardando dados do smartwatch...',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                            SizedBox(height: 4),
+                            TranslatedText(
+                              'Certifique-se de que o relógio está conectado',
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
                       )
                     else
                       Row(

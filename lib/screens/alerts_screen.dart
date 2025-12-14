@@ -1,6 +1,6 @@
-import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/firebase_sync_service.dart';
 
 class AlertsScreen extends StatefulWidget {
   const AlertsScreen({super.key});
@@ -11,130 +11,65 @@ class AlertsScreen extends StatefulWidget {
 
 class _AlertsScreenState extends State<AlertsScreen> {
   List<Map<String, dynamic>> alerts = [];
+  bool _isLoading = true;
 
-  final List<String> predefinedTitles = [
-    'Queda detectada',
-    'Bateria baixa',
-    'Fora da área segura',
-    'Inatividade prolongada',
-    'Frequência cardíaca elevada',
-  ];
+  final String _elderId = 'elder_demo';
+  final FirebaseSyncService _syncService = FirebaseSyncService();
+  StreamSubscription? _alertsSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadAlerts();
+    _subscribeToAlerts();
   }
 
-  Future<void> _loadAlerts() async {
-    final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getString('alerts');
-    if (stored != null) {
+  @override
+  void dispose() {
+    _alertsSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _subscribeToAlerts() {
+    // Listen to alerts from Firebase (from smartwatch)
+    _alertsSubscription = _syncService
+        .listenToAlerts(_elderId)
+        .listen((alertsList) {
       setState(() {
-        alerts = List<Map<String, dynamic>>.from(jsonDecode(stored));
+        alerts = alertsList;
+        _isLoading = false;
       });
-    } else {
-      alerts = [
-        {'title': 'Queda detectada', 'time': 'Há 2 min', 'read': false},
-        {'title': 'Bateria baixa', 'time': 'Há 10 min', 'read': false},
-        {'title': 'Fora da área segura', 'time': 'Há 30 min', 'read': true},
-      ];
-      _saveAlerts();
-    }
-  }
-
-  Future<void> _saveAlerts() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('alerts', jsonEncode(alerts));
-  }
-
-  Future<void> _addAlert(String title, String time) async {
-    setState(() {
-      alerts.insert(0, {'title': title, 'time': time, 'read': false});
     });
-    await _saveAlerts();
+
+    // Set loading to false after timeout
+    Future.delayed(const Duration(seconds: 5), () {
+      if (_isLoading) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    });
   }
 
   Future<void> _markAsRead(int index) async {
-    setState(() {
-      alerts[index]['read'] = true;
-    });
-    await _saveAlerts();
+    final alert = alerts[index];
+    final alertId = alert['id'];
+    if (alertId != null) {
+      await _syncService.markAlertRead(_elderId, alertId);
+    }
   }
 
-  Future<void> _showAddAlertDialog() async {
-    String? selectedTitle = predefinedTitles.first;
-    String selectedTime = 'Agora';
-
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Adicionar Alerta Simulado'),
-          content: StatefulBuilder(
-            builder: (context, setDialogState) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String>(
-                    value: selectedTitle,
-                    decoration:
-                        const InputDecoration(labelText: 'Tipo de alerta'),
-                    items: predefinedTitles
-                        .map((title) =>
-                            DropdownMenuItem(value: title, child: Text(title)))
-                        .toList(),
-                    onChanged: (value) =>
-                        setDialogState(() => selectedTitle = value),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: selectedTime,
-                    decoration: const InputDecoration(
-                        labelText: 'Tempo desde o alerta'),
-                    items: [
-                      'Agora',
-                      'Há 2 min',
-                      'Há 10 min',
-                      'Há 30 min',
-                      'Há 1 h',
-                      'Há 3 h',
-                    ]
-                        .map((time) =>
-                            DropdownMenuItem(value: time, child: Text(time)))
-                        .toList(),
-                    onChanged: (value) =>
-                        setDialogState(() => selectedTime = value ?? 'Agora'),
-                  ),
-                ],
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (selectedTitle != null) {
-                  _addAlert(selectedTitle!, selectedTime);
-                }
-                Navigator.pop(context);
-              },
-              child: const Text('Adicionar'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _clearAll() async {
-    setState(() {
-      alerts.clear();
-    });
-    await _saveAlerts();
+  String _formatTime(String? timestamp) {
+    if (timestamp == null) return '';
+    try {
+      final dt = DateTime.parse(timestamp);
+      final diff = DateTime.now().difference(dt);
+      if (diff.inMinutes < 1) return 'Agora';
+      if (diff.inMinutes < 60) return 'Há ${diff.inMinutes} min';
+      if (diff.inHours < 24) return 'Há ${diff.inHours} h';
+      return 'Há ${diff.inDays} dias';
+    } catch (e) {
+      return '';
+    }
   }
 
   @override
@@ -148,89 +83,117 @@ class _AlertsScreenState extends State<AlertsScreen> {
           onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
         ),
         title: const Text('Alertas'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_alert),
-            tooltip: 'Adicionar alerta simulado',
-            onPressed: _showAddAlertDialog,
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_forever),
-            tooltip: 'Limpar todos os alertas',
-            onPressed: _clearAll,
-          ),
-        ],
       ),
-      body: alerts.isEmpty
-          ? Center(
-              child: Text(
-                'Nenhum alerta disponível.',
-                style: TextStyle(
-                  color: isDark ? Colors.teal[700] : Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            )
-          : ListView.builder(
-              itemCount: alerts.length,
-              itemBuilder: (context, index) {
-                final alert = alerts[index];
-                final isRead = alert['read'] ?? false;
-
-                IconData icon;
-                Color iconColor;
-                Color cardColor;
-
-                switch (alert['title']) {
-                  case 'Bateria baixa':
-                    icon = Icons.battery_alert;
-                    iconColor = Colors.redAccent;
-                    cardColor = isRead ? Colors.grey[100]! : Colors.red.shade50;
-                    break;
-                  case 'Queda detectada':
-                    icon = Icons.warning;
-                    iconColor = Colors.redAccent;
-                    cardColor = isRead ? Colors.grey[100]! : Colors.red.shade50;
-                    break;
-                  case 'Fora da área segura':
-                    icon = Icons.location_off;
-                    iconColor = Colors.redAccent;
-                    cardColor = isRead ? Colors.grey[100]! : Colors.red.shade50;
-                    break;
-                  default:
-                    icon = Icons.notifications_active;
-                    iconColor = Colors.blueAccent;
-                    cardColor = isRead ? Colors.grey[100]! : Colors.blue.shade50;
-                }
-
-                return Card(
-                  color: cardColor,
-                  margin:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: ListTile(
-                    leading: Icon(icon, color: iconColor),
-                    title: Text(
-                      alert['title'],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black, // sempre preto
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : alerts.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.notifications_off,
+                        size: 64,
+                        color: Colors.grey[400],
                       ),
-                    ),
-                    subtitle: Text(
-                      alert['time'],
-                      style: const TextStyle(color: Colors.black), // sempre preto
-                    ),
-                    trailing: !isRead
-                        ? IconButton(
-                            icon: const Icon(Icons.done, color: Colors.green),
-                            tooltip: 'Marcar como lido',
-                            onPressed: () => _markAsRead(index),
-                          )
-                        : null,
+                      const SizedBox(height: 16),
+                      Text(
+                        'Nenhum alerta',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white70 : Colors.black54,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Os alertas do smartwatch aparecerão aqui',
+                        style: TextStyle(
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
                   ),
-                );
-              },
-            ),
+                )
+              : ListView.builder(
+                  itemCount: alerts.length,
+                  itemBuilder: (context, index) {
+                    final alert = alerts[index];
+                    final isRead = alert['read'] ?? false;
+                    final title = alert['title'] ?? 'Alerta';
+                    final body = alert['body'] ?? '';
+                    final timestamp = alert['timestamp'] as String?;
+
+                    IconData icon;
+                    Color iconColor;
+                    Color cardColor;
+
+                    // Determine icon based on alert title or type
+                    final lowerTitle = title.toString().toLowerCase();
+                    if (lowerTitle.contains('queda') || lowerTitle.contains('fall')) {
+                      icon = Icons.warning;
+                      iconColor = Colors.redAccent;
+                      cardColor = isRead ? Colors.grey[100]! : Colors.red.shade50;
+                    } else if (lowerTitle.contains('bateria') || lowerTitle.contains('battery')) {
+                      icon = Icons.battery_alert;
+                      iconColor = Colors.orange;
+                      cardColor = isRead ? Colors.grey[100]! : Colors.orange.shade50;
+                    } else if (lowerTitle.contains('área') || lowerTitle.contains('geofence') || lowerTitle.contains('location')) {
+                      icon = Icons.location_off;
+                      iconColor = Colors.redAccent;
+                      cardColor = isRead ? Colors.grey[100]! : Colors.red.shade50;
+                    } else if (lowerTitle.contains('emergência') || lowerTitle.contains('emergency') || lowerTitle.contains('sos')) {
+                      icon = Icons.emergency;
+                      iconColor = Colors.red;
+                      cardColor = isRead ? Colors.grey[100]! : Colors.red.shade100;
+                    } else if (lowerTitle.contains('cardíac') || lowerTitle.contains('heart') || lowerTitle.contains('bpm')) {
+                      icon = Icons.favorite;
+                      iconColor = Colors.red;
+                      cardColor = isRead ? Colors.grey[100]! : Colors.red.shade50;
+                    } else {
+                      icon = Icons.notifications_active;
+                      iconColor = Colors.blueAccent;
+                      cardColor = isRead ? Colors.grey[100]! : Colors.blue.shade50;
+                    }
+
+                    return Card(
+                      color: cardColor,
+                      margin:
+                          const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      child: ListTile(
+                        leading: Icon(icon, color: iconColor),
+                        title: Text(
+                          title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (body.isNotEmpty)
+                              Text(
+                                body,
+                                style: const TextStyle(color: Colors.black87),
+                              ),
+                            Text(
+                              _formatTime(timestamp),
+                              style: const TextStyle(color: Colors.grey, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                        trailing: !isRead
+                            ? IconButton(
+                                icon: const Icon(Icons.done, color: Colors.green),
+                                tooltip: 'Marcar como lido',
+                                onPressed: () => _markAsRead(index),
+                              )
+                            : null,
+                      ),
+                    );
+                  },
+                ),
     );
   }
 }
