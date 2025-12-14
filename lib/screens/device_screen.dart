@@ -1,10 +1,104 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../services/firebase_sync_service.dart';
 
-class DeviceScreen extends StatelessWidget {
+class DeviceScreen extends StatefulWidget {
   const DeviceScreen({super.key});
 
   @override
+  State<DeviceScreen> createState() => _DeviceScreenState();
+}
+
+class _DeviceScreenState extends State<DeviceScreen> {
+  Map<String, dynamic>? _deviceStatus;
+  bool _isLoading = true;
+  bool _isOnline = false;
+
+  final String _elderId = 'elder_demo';
+  final FirebaseSyncService _syncService = FirebaseSyncService();
+  StreamSubscription? _deviceSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribeToDeviceStatus();
+  }
+
+  @override
+  void dispose() {
+    _deviceSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _subscribeToDeviceStatus() {
+    _deviceSubscription = _syncService
+        .listenToDeviceStatus(_elderId)
+        .listen((status) {
+      if (status != null) {
+        setState(() {
+          _deviceStatus = status;
+          _isLoading = false;
+          _isOnline = _checkIfOnline(status['lastSync']);
+        });
+      }
+    });
+
+    // Timeout for loading
+    Future.delayed(const Duration(seconds: 5), () {
+      if (_isLoading) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    });
+  }
+
+  bool _checkIfOnline(String? lastSync) {
+    if (lastSync == null) return false;
+    try {
+      final dt = DateTime.parse(lastSync);
+      final diff = DateTime.now().difference(dt);
+      return diff.inMinutes < 5; // Consider online if updated within 5 minutes
+    } catch (e) {
+      return false;
+    }
+  }
+
+  String _formatLastSync(String? lastSync) {
+    if (lastSync == null) return 'Desconhecido';
+    try {
+      final dt = DateTime.parse(lastSync);
+      final diff = DateTime.now().difference(dt);
+      if (diff.inMinutes < 1) return 'Agora';
+      if (diff.inMinutes < 60) return 'Há ${diff.inMinutes} min';
+      if (diff.inHours < 24) return 'Há ${diff.inHours} h';
+      return 'Há ${diff.inDays} dias';
+    } catch (e) {
+      return 'Desconhecido';
+    }
+  }
+
+  void _requestSync() {
+    // This would trigger a sync request to the smartwatch
+    // For now, just show a message that we're waiting
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Aguardando sincronização do relógio...'),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // Extract device info from Firebase data
+    final batteryLevel = _deviceStatus?['batteryLevel'] ?? 0;
+    final isCharging = _deviceStatus?['isCharging'] ?? false;
+    final model = _deviceStatus?['model'] ?? 'Desconhecido';
+    final firmwareVersion = _deviceStatus?['firmwareVersion'] ?? 'Desconhecido';
+    final lastSync = _deviceStatus?['lastSync'] as String?;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dispositivo'),
@@ -15,106 +109,172 @@ class DeviceScreen extends StatelessWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              elevation: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Status do Relógio',
-                      style:
-                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    SizedBox(height: 8),
-                    ListTile(
-                      leading: Icon(Icons.watch, color: Colors.blueAccent),
-                      title: Text('Modelo: SmartWatch Sênior'),
-                      subtitle: Text('Firmware v1.2.4'),
-                    ),
-                    ListTile(
-                      leading:
-                          Icon(Icons.battery_full, color: Colors.greenAccent),
-                      title: Text('Bateria: 78%'),
-                      subtitle: Text('Carregando'),
-                    ),
-                    ListTile(
-                      leading: Icon(Icons.bluetooth, color: Colors.blueAccent),
-                      title: Text('Conectividade: Bluetooth ativo'),
-                      subtitle: Text('Última conexão há 3 minutos'),
-                    ),
-                    ListTile(
-                      leading:
-                          Icon(Icons.location_on, color: Colors.redAccent),
-                      title: Text('Localização: Ativa'),
-                      subtitle: Text('Última atualização há 2 minutos'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Ações Rápidas',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _ActionButton(
-                    icon: Icons.sync,
-                    label: 'Sincronizar',
-                    color: Colors.lightBlueAccent,
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Sincronização iniciada!'),
-                        ),
-                      );
-                    },
+                  // Device Status Card
+                  Card(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 4,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: _deviceStatus == null
+                          ? _buildNoDeviceState()
+                          : _buildDeviceInfo(
+                              batteryLevel: batteryLevel,
+                              isCharging: isCharging,
+                              model: model,
+                              firmwareVersion: firmwareVersion,
+                              lastSync: lastSync,
+                            ),
+                    ),
                   ),
-                  _ActionButton(
-                    icon: Icons.restart_alt,
-                    label: 'Reiniciar',
-                    color: Colors.lightBlueAccent,
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('O dispositivo está reiniciando...'),
-                        ),
-                      );
-                    },
+                  const SizedBox(height: 24),
+                  Text(
+                    'Ações Rápidas',
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  _ActionButton(
-                    icon: Icons.location_searching,
-                    label: 'Localizar',
-                    color: Colors.lightBlueAccent,
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Buscando localização do relógio...'),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: GridView.count(
+                      crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      children: [
+                        _ActionButton(
+                          icon: Icons.sync,
+                          label: 'Sincronizar',
+                          color: Colors.lightBlueAccent,
+                          onTap: _requestSync,
                         ),
-                      );
-                    },
+                        _ActionButton(
+                          icon: Icons.location_searching,
+                          label: 'Localizar',
+                          color: Colors.lightBlueAccent,
+                          onTap: () {
+                            Navigator.pushReplacementNamed(context, '/map');
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildNoDeviceState() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.watch_off, size: 64, color: Colors.grey),
+        const SizedBox(height: 16),
+        const Text(
+          'Relógio não conectado',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Aguardando dados do smartwatch do idoso...',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Certifique-se de que o relógio está:\n• Ligado\n• Com o app aberto\n• Conectado à internet',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDeviceInfo({
+    required int batteryLevel,
+    required bool isCharging,
+    required String model,
+    required String firmwareVersion,
+    required String? lastSync,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Status do Relógio',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: _isOnline ? Colors.green : Colors.grey,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                _isOnline ? 'Online' : 'Offline',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 8),
+        ListTile(
+          leading: const Icon(Icons.watch, color: Colors.blueAccent),
+          title: Text('Modelo: $model'),
+          subtitle: Text('Firmware $firmwareVersion'),
+        ),
+        ListTile(
+          leading: Icon(
+            isCharging ? Icons.battery_charging_full : _getBatteryIcon(batteryLevel),
+            color: _getBatteryColor(batteryLevel),
+          ),
+          title: Text('Bateria: $batteryLevel%'),
+          subtitle: Text(isCharging ? 'Carregando' : _getBatteryStatus(batteryLevel)),
+        ),
+        ListTile(
+          leading: Icon(
+            _isOnline ? Icons.wifi : Icons.wifi_off,
+            color: _isOnline ? Colors.green : Colors.grey,
+          ),
+          title: Text('Conectividade: ${_isOnline ? "Conectado" : "Desconectado"}'),
+          subtitle: Text('Última sincronização: ${_formatLastSync(lastSync)}'),
+        ),
+      ],
     );
+  }
+
+  IconData _getBatteryIcon(int level) {
+    if (level > 80) return Icons.battery_full;
+    if (level > 50) return Icons.battery_5_bar;
+    if (level > 20) return Icons.battery_3_bar;
+    return Icons.battery_alert;
+  }
+
+  Color _getBatteryColor(int level) {
+    if (level > 50) return Colors.green;
+    if (level > 20) return Colors.orange;
+    return Colors.red;
+  }
+
+  String _getBatteryStatus(int level) {
+    if (level > 80) return 'Excelente';
+    if (level > 50) return 'Bom';
+    if (level > 20) return 'Baixo';
+    return 'Crítico - Carregar agora!';
   }
 }
 

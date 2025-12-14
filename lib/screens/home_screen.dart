@@ -1,10 +1,10 @@
-import 'dart:convert';
-import 'dart:math';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/theme_provider.dart';
+import '../providers/locale_provider.dart';
+import '../models/health_data.dart';
+import '../services/firebase_sync_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -21,14 +21,18 @@ class _MenuItem {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  int heartRate = 78;
-  int spo2 = 96;
-  bool insideGeofence = true;
-  DateTime lastUpdate = DateTime.now();
+  // Health data from Firebase (real data from smartwatch)
+  HealthData? _healthData;
+  bool _insideGeofence = true;
+  DateTime _lastUpdate = DateTime.now();
+  bool _isLoading = true;
 
-  Timer? _timer;
-  double _progress = 0.0;
-  final int _updateInterval = 10; // intervalo fixo
+  // Elder ID for Firebase sync
+  final String _elderId = 'elder_demo';
+  
+  // Firebase sync service
+  final FirebaseSyncService _syncService = FirebaseSyncService();
+  StreamSubscription? _healthSubscription;
 
   final List<_MenuItem> menuItems = [
     _MenuItem('Painel', Icons.dashboard, '/dashboard'),
@@ -37,14 +41,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _MenuItem('Mapa', Icons.map, '/map'),
   ];
 
-  Future<int> _getUnreadCount() async {
-    final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getString('alerts');
-    if (stored == null) return 0;
-    final alerts = List<Map<String, dynamic>>.from(jsonDecode(stored));
-    return alerts.where((a) => !a['read']).length;
+  @override
+  void initState() {
+    super.initState();
+    _subscribeToHealthData();
   }
 
+  @override
+  void dispose() {
+    _healthSubscription?.cancel();
+    super.dispose();
   void _refreshStatus() async {
     final rand = Random();
     final newHeartRate = 60 + rand.nextInt(60); // 60–120 bpm
@@ -68,27 +74,60 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     await prefs.setString('last_update', newLastUpdate.toIso8601String());
   }
 
-  void _startAutoUpdate() {
-    _timer?.cancel();
-    const tick = Duration(milliseconds: 100);
-    final totalTicks = _updateInterval * 10; // 100ms * 10 = 1s
-    int currentTick = 0;
+  void _subscribeToHealthData() {
+    // Listen to real health data from Firebase (from smartwatch)
+    _healthSubscription = _syncService
+        .listenToHealthData(_elderId)
+        .listen((healthData) {
+      if (healthData != null) {
+        setState(() {
+          _healthData = healthData;
+          _lastUpdate = healthData.timestamp;
+          _isLoading = false;
+        });
+      }
+    });
 
-    _timer = Timer.periodic(tick, (t) {
-      setState(() {
-        currentTick++;
-        _progress = currentTick / totalTicks;
-        if (_progress >= 1.0) {
-          _refreshStatus();
-          currentTick = 0;
-          _progress = 0.0;
-        }
-      });
+    // Also listen to location for geofence status
+    _syncService.listenToLocation(_elderId).listen((location) {
+      // Geofence check would be done here with real data
+      // For now, we update the timestamp
+      if (location != null) {
+        setState(() {
+          _lastUpdate = location.timestamp;
+        });
+      }
+    });
+
+    // Set loading to false after initial timeout - no simulated data
+    Future.delayed(const Duration(seconds: 5), () {
+      if (_isLoading) {
+        setState(() {
+          _isLoading = false;
+          // No simulated data - leave _healthData as null
+        });
+      }
+    });
+  }
+
+  void _refreshStatus() {
+    setState(() {
+      _lastUpdate = DateTime.now();
+    });
+    
+    // Re-fetch from Firebase
+    _syncService.getHealthData(_elderId).then((data) {
+      if (data != null) {
+        setState(() {
+          _healthData = data;
+          _lastUpdate = data.timestamp;
+        });
+      }
     });
   }
 
   String _timeSinceUpdate() {
-    final diff = DateTime.now().difference(lastUpdate);
+    final diff = DateTime.now().difference(_lastUpdate);
     if (diff.inMinutes < 1) return 'Atualizado há poucos segundos';
     if (diff.inMinutes < 60) return 'Atualizado há ${diff.inMinutes} min';
     return 'Atualizado há ${diff.inHours} h';
@@ -131,9 +170,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final progressColor = isDark ? Colors.tealAccent : Colors.blueAccent;
     final progressBgColor = isDark ? Colors.white12 : Colors.grey.shade300;
 
+    // Get health values - show placeholder if no data
+    final hasData = _healthData != null;
+    final heartRate = _healthData?.heartRate ?? 0;
+    final spo2 = _healthData?.spo2 ?? 0;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Monitoramento de Idosos'),
+        title: const TranslatedText('Monitoramento de Idosos'),
         actions: [
           IconButton(
             icon: const Icon(Icons.person),
@@ -165,7 +209,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // --- PAINEL DE STATUS DO IDOSO ---
+            // Status Panel
             Card(
               elevation: 4,
               shape: RoundedRectangleBorder(
@@ -175,7 +219,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    Text(
+                    TranslatedText(
                       'Resumo do Idoso Monitorado',
                       style: TextStyle(
                         fontSize: 18,
@@ -184,41 +228,91 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _StatusItem(
-                          icon: Icons.favorite,
-                          label: 'Batimentos',
-                          value: '$heartRate bpm',
-                          color: heartRate > 110 || heartRate < 60
-                              ? Colors.red
-                              : Colors.green,
+                    
+                    if (_isLoading)
+                      const Padding(
+                        padding: EdgeInsets.all(20),
+                        child: CircularProgressIndicator(),
+                      )
+                    else if (!hasData)
+                      const Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Column(
+                          children: [
+                            Icon(Icons.watch_off, size: 48, color: Colors.grey),
+                            SizedBox(height: 8),
+                            TranslatedText(
+                              'Aguardando dados do smartwatch...',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                            SizedBox(height: 4),
+                            TranslatedText(
+                              'Certifique-se de que o relógio está conectado',
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
                         ),
-                        _StatusItem(
-                          icon: Icons.bloodtype,
-                          label: 'Oxigênio',
-                          value: '$spo2%',
-                          color: spo2 < 94 ? Colors.orange : Colors.green,
-                        ),
-                        _StatusItem(
-                          icon: Icons.location_on,
-                          label: 'Geofence',
-                          value: insideGeofence
-                              ? 'Dentro da área segura'
-                              : 'Fora da área segura',
-                          color:
-                              insideGeofence ? Colors.green : Colors.redAccent,
-                        ),
-                      ],
-                    ),
+                      )
+                    else
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _StatusItem(
+                            icon: Icons.favorite,
+                            label: 'Batimentos',
+                            value: '$heartRate bpm',
+                            color: heartRate > 110 || heartRate < 50
+                                ? Colors.red
+                                : Colors.green,
+                          ),
+                          _StatusItem(
+                            icon: Icons.bloodtype,
+                            label: 'Oxigênio',
+                            value: '$spo2%',
+                            color: spo2 < 94 ? Colors.orange : Colors.green,
+                          ),
+                          _StatusItem(
+                            icon: Icons.location_on,
+                            label: 'Geofence',
+                            value: _insideGeofence
+                                ? 'Dentro da área segura'
+                                : 'Fora da área segura',
+                            color:
+                                _insideGeofence ? Colors.green : Colors.redAccent,
+                          ),
+                        ],
+                      ),
+                    
                     const SizedBox(height: 12),
-                    LinearProgressIndicator(
-                      value: _progress,
-                      minHeight: 6,
-                      backgroundColor: progressBgColor,
-                      color: progressColor,
-                    ),
+                    
+                    // Status indicator
+                    if (_healthData?.isCritical == true)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.warning, color: Colors.red),
+                            SizedBox(width: 8),
+                            TranslatedText(
+                              'Atenção: Sinais vitais críticos!',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    
                     const SizedBox(height: 8),
                     Text(
                       'Próxima atualização em $_updateInterval s',
@@ -238,7 +332,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                       onPressed: _refreshStatus,
                       icon: const Icon(Icons.refresh),
-                      label: const Text('Atualizar agora'),
+                      label: const TranslatedText('Atualizar agora'),
                     ),
                   ],
                 ),
@@ -246,7 +340,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             const SizedBox(height: 16),
 
-            // --- GRADE DE FUNCIONALIDADES ---
+            // Feature Grid
             Expanded(
               child: GridView.builder(
                 itemCount: menuItems.length,
@@ -305,7 +399,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-// StatusItem
+// StatusItem widget
 class _StatusItem extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -325,15 +419,14 @@ class _StatusItem extends StatelessWidget {
       children: [
         Icon(icon, size: 36, color: color),
         const SizedBox(height: 4),
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-        Text(value,
-            style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+        TranslatedText(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+        Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
       ],
     );
   }
 }
 
-// HoverAnimatedButton
+// HoverAnimatedButton widget
 class _HoverAnimatedButton extends StatefulWidget {
   final Color color;
   final Color hoverColor;
@@ -341,7 +434,6 @@ class _HoverAnimatedButton extends StatefulWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final int? badgeCount;
 
   const _HoverAnimatedButton({
     required this.color,
@@ -350,7 +442,6 @@ class _HoverAnimatedButton extends StatefulWidget {
     required this.icon,
     required this.label,
     required this.onTap,
-    this.badgeCount,
   });
 
   @override
@@ -380,45 +471,19 @@ class _HoverAnimatedButtonState extends State<_HoverAnimatedButton> {
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: widget.onTap,
-          child: Stack(
-            alignment: Alignment.topRight,
-            children: [
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(widget.icon, size: 40, color: widget.iconColor),
-                    const SizedBox(height: 10),
-                    Text(
-                      widget.label,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600, color: widget.iconColor),
-                    ),
-                  ],
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(widget.icon, size: 40, color: widget.iconColor),
+                const SizedBox(height: 10),
+                TranslatedText(
+                  widget.label,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600, color: widget.iconColor),
                 ),
-              ),
-              if (widget.badgeCount != null && widget.badgeCount! > 0)
-                Positioned(
-                  right: 12,
-                  top: 12,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.redAccent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      widget.badgeCount.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

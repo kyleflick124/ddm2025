@@ -1,0 +1,39 @@
+name: elder_watch
+description: Wear OS smartwatch app for elderly monitoring - sends health data to caregivers
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Firebase for data sync
+  firebase_core: ^4.2.1
+  firebase_database: ^12.0.4
+
+  # Location services
+  geolocator: ^14.0.2
+
+  # Wear OS specific
+  wear: ^1.1.0
+
+  # Sensors (heart rate, accelerometer)
+  # Note: These require platform-specific implementation
+  sensors_plus: ^4.0.2
+  
+  # Utilities
+  uuid: ^4.5.2
+  battery_plus: ^6.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

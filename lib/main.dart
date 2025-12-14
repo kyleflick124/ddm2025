@@ -20,16 +20,15 @@ import 'screens/elder_home_screen.dart';
 import 'screens/elder_profile_screen.dart';
 import 'providers/theme_provider.dart';
 import 'providers/locale_provider.dart';
-import 'providers/session_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 🔥 Firebase inicializado corretamente para Web / Android / iOS
+  
+  // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
+  
   runApp(const ProviderScope(child: ElderMonitorApp()));
 }
 
