@@ -94,14 +94,55 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ref.read(elderProvider.notifier).setCaregiverId(user.uid);
       
     } else if (selectedRole == 'idoso') {
-      // Check if running on smartwatch
+      // Try to find elder by email
+      final elderEmail = user.email ?? '';
+      String? elderId = await _syncService.findElderByEmail(elderEmail);
+      
+      // Save elder info locally
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('elder_email', elderEmail);
+      await prefs.setString('elder_auth_uid', user.uid);
+      
+      if (elderId != null) {
+        // Elder found - link and save
+        await prefs.setString('elder_id', elderId);
+        
+        // Link auth UID to elder profile
+        _syncService.linkElderAuthUid(elderId, user.uid).catchError((_) {});
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: TranslatedText('Vinculado ao seu cuidador com sucesso!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        // Elder not pre-registered - save pending registration
+        // When caregiver adds this email later, they will be linked
+        await _syncService.registerPendingElder(
+          email: elderEmail,
+          authUid: user.uid,
+          name: user.displayName ?? 'Idoso',
+        );
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: TranslatedText('Aguardando seu cuidador vincular você.'),
+              backgroundColor: Colors.blue,
+            ),
+          );
+        }
+      }
+      
+      // Navigate based on device type
       if (_isSmartwatch) {
-        // Go to watch interface for smartwatch
         if (mounted) {
           Navigator.pushReplacementNamed(context, '/watch_home');
         }
       } else {
-        // Go to elder home for phone/tablet
         if (mounted) {
           Navigator.pushReplacementNamed(context, '/elder_home');
         }
