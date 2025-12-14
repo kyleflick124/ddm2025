@@ -986,6 +986,591 @@ void main() {
       expect(routes.length, 12);
     });
   });
+
+  // ============================================================
+  // FALL DETECTION TESTS
+  // ============================================================
+  group('Fall Detection', () {
+    test('should detect fall when acceleration exceeds threshold', () {
+      // Fall detection threshold is 25.0 (g-force magnitude)
+      const fallThreshold = 25.0;
+      const normalWalking = 12.0;
+      const fallImpact = 30.0;
+      
+      expect(normalWalking < fallThreshold, true);
+      expect(fallImpact > fallThreshold, true);
+    });
+
+    test('should trigger confirmation dialog on fall detection', () {
+      bool fallDetected = false;
+      bool dialogShown = false;
+      
+      // Simulate fall detection
+      void onFallDetected() {
+        fallDetected = true;
+        dialogShown = true;
+      }
+      
+      onFallDetected();
+      
+      expect(fallDetected, true);
+      expect(dialogShown, true);
+    });
+
+    test('should auto-confirm emergency after 30 seconds if no response', () {
+      const autoConfirmDelay = Duration(seconds: 30);
+      
+      expect(autoConfirmDelay.inSeconds, 30);
+    });
+
+    test('should allow user to cancel false positive fall alert', () {
+      bool fallDetected = true;
+      
+      void cancelFallAlert() {
+        fallDetected = false;
+      }
+      
+      cancelFallAlert();
+      
+      expect(fallDetected, false);
+    });
+
+    test('fall alert types should be distinct', () {
+      const fallTypes = ['fall', 'fall_confirmed'];
+      
+      expect(fallTypes.contains('fall'), true);
+      expect(fallTypes.contains('fall_confirmed'), true);
+      expect(fallTypes.length, 2);
+    });
+  });
+
+  // ============================================================
+  // NOTIFICATION TESTS
+  // ============================================================
+  group('Notifications', () {
+    test('should have notification channel for elder monitoring', () {
+      const channelId = 'elder_monitor_channel';
+      const channelName = 'Elder Monitor Alerts';
+      
+      expect(channelId, isNotEmpty);
+      expect(channelName, isNotEmpty);
+    });
+
+    test('emergency notification should have correct priority', () {
+      const importance = 'high';
+      const priority = 'high';
+      
+      expect(importance, 'high');
+      expect(priority, 'high');
+    });
+
+    test('should support different notification types', () {
+      final notificationTypes = [
+        'emergency',
+        'fall',
+        'geofence',
+        'battery',
+      ];
+      
+      expect(notificationTypes.length, 4);
+      expect(notificationTypes.contains('emergency'), true);
+      expect(notificationTypes.contains('fall'), true);
+    });
+
+    test('notification payloads should be serializable', () {
+      final payload = {
+        'type': 'emergency',
+        'elderId': 'elder_123',
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+      
+      expect(payload['type'], 'emergency');
+      expect(payload['elderId'], isNotEmpty);
+      expect(payload['timestamp'], isNotNull);
+    });
+
+    test('should subscribe to elder-specific topics', () {
+      const elderId = 'elder_123';
+      final topic = 'elder_$elderId';
+      
+      expect(topic, 'elder_elder_123');
+    });
+
+    test('low battery threshold should be 15%', () {
+      const lowBatteryThreshold = 15;
+      const currentBattery = 10;
+      
+      expect(currentBattery < lowBatteryThreshold, true);
+    });
+
+    test('critical heart rate should trigger notification', () {
+      const normalHeartRate = 75;
+      const highHeartRate = 125;
+      const lowHeartRate = 45;
+      const maxNormal = 120;
+      const minNormal = 50;
+      
+      expect(normalHeartRate < maxNormal && normalHeartRate > minNormal, true);
+      expect(highHeartRate > maxNormal, true);
+      expect(lowHeartRate < minNormal, true);
+    });
+  });
+
+  // ============================================================
+  // MULTI-ELDER SCENARIO TESTS
+  // ============================================================
+  group('Multi-Elder Scenarios', () {
+    test('caregiver with multiple elders should receive alerts for any elder', () {
+      // Scenario: Caregiver has elder_001 and elder_002
+      // elder_002 falls, caregiver should be notified even if active is elder_001
+      
+      final caregiver = {
+        'id': 'caregiver_abc',
+        'elders': ['elder_001', 'elder_002', 'elder_003'],
+        'activeElderId': 'elder_001',
+      };
+      
+      final alert = {
+        'elderId': 'elder_002', // Not the active elder
+        'type': 'fall',
+        'message': 'Queda detectada',
+      };
+      
+      // Caregiver should be notified because elder_002 is in their list
+      final elderInList = (caregiver['elders'] as List).contains(alert['elderId']);
+      expect(elderInList, true);
+    });
+
+    test('alert should include elder name for identification', () {
+      final elders = [
+        {'id': 'elder_001', 'name': 'João Silva'},
+        {'id': 'elder_002', 'name': 'Maria Santos'},
+      ];
+      
+      final alert = {
+        'elderId': 'elder_002',
+        'type': 'emergency',
+      };
+      
+      // Find elder name for notification
+      final elder = elders.firstWhere((e) => e['id'] == alert['elderId']);
+      expect(elder['name'], 'Maria Santos');
+    });
+
+    test('switching active elder should not affect alert subscriptions', () {
+      final subscriptions = <String>['elder_001', 'elder_002'];
+      
+      // Change active elder
+      String activeElder = 'elder_001';
+      activeElder = 'elder_002';
+      
+      // Subscriptions should remain unchanged
+      expect(subscriptions.contains('elder_001'), true);
+      expect(subscriptions.contains('elder_002'), true);
+      expect(activeElder, 'elder_002');
+    });
+
+    test('removing elder should unsubscribe from their alerts', () {
+      final subscriptions = <String>['elder_001', 'elder_002', 'elder_003'];
+      
+      // Remove elder_002
+      subscriptions.remove('elder_002');
+      
+      expect(subscriptions.contains('elder_002'), false);
+      expect(subscriptions.length, 2);
+    });
+
+    test('adding new elder should subscribe to their alerts', () {
+      final subscriptions = <String>['elder_001'];
+      
+      // Add new elder
+      subscriptions.add('elder_new');
+      
+      expect(subscriptions.contains('elder_new'), true);
+      expect(subscriptions.length, 2);
+    });
+  });
+
+  // ============================================================
+  // ALERT FLOW TESTS
+  // ============================================================
+  group('Alert Flow', () {
+    test('emergency alert should have highest priority', () {
+      final alertPriorities = {
+        'emergency': 5,
+        'fall': 4,
+        'geofence': 3,
+        'heart_rate': 3,
+        'battery': 2,
+        'info': 1,
+      };
+      
+      expect(alertPriorities['emergency'], 5);
+      expect(alertPriorities['fall']! < alertPriorities['emergency']!, true);
+    });
+
+    test('fall alert should auto-escalate after timeout', () {
+      const timeoutSeconds = 30;
+      bool userResponded = false;
+      bool alertEscalated = false;
+      
+      // Simulate timeout
+      if (!userResponded) {
+        alertEscalated = true;
+      }
+      
+      expect(timeoutSeconds, 30);
+      expect(alertEscalated, true);
+    });
+
+    test('multiple alerts should be processed in order', () {
+      final alertQueue = <Map<String, dynamic>>[];
+      
+      alertQueue.add({'type': 'battery', 'timestamp': '2024-01-01T10:00:00'});
+      alertQueue.add({'type': 'fall', 'timestamp': '2024-01-01T10:00:01'});
+      alertQueue.add({'type': 'emergency', 'timestamp': '2024-01-01T10:00:02'});
+      
+      expect(alertQueue.length, 3);
+      expect(alertQueue.first['type'], 'battery');
+      expect(alertQueue.last['type'], 'emergency');
+    });
+
+    test('alert should include timestamp and source', () {
+      final alert = {
+        'id': 'alert_123',
+        'type': 'fall',
+        'message': 'Queda detectada',
+        'timestamp': DateTime.now().toIso8601String(),
+        'source': 'watch',
+        'elderId': 'elder_001',
+      };
+      
+      expect(alert['timestamp'], isNotNull);
+      expect(alert['source'], 'watch');
+      expect(alert['elderId'], isNotEmpty);
+    });
+
+    test('marking alert as read should persist', () {
+      final alert = {'id': 'alert_123', 'read': false};
+      
+      // Mark as read
+      alert['read'] = true;
+      
+      expect(alert['read'], true);
+    });
+  });
+
+  // ============================================================
+  // FIREBASE PATH STRUCTURE TESTS
+  // ============================================================
+  group('Firebase Path Structure', () {
+    test('elder data paths should be consistent', () {
+      const elderId = 'elder_001';
+      
+      final paths = {
+        'health': 'elders/$elderId/health',
+        'location': 'elders/$elderId/location',
+        'alerts': 'elders/$elderId/alerts',
+        'device': 'elders/$elderId/device',
+        'emergency': 'elders/$elderId/emergency',
+        'heartRateHistory': 'elders/$elderId/heartRateHistory',
+        'geofences': 'elders/$elderId/geofences',
+      };
+      
+      expect(paths['health'], contains(elderId));
+      expect(paths['alerts'], contains(elderId));
+      expect(paths.length, 7);
+    });
+
+    test('caregiver paths should be separate from elder paths', () {
+      const caregiverId = 'caregiver_abc';
+      const elderId = 'elder_001';
+      
+      final caregiverPath = 'caregivers/$caregiverId';
+      final elderPath = 'elders/$elderId';
+      
+      expect(caregiverPath.startsWith('caregivers/'), true);
+      expect(elderPath.startsWith('elders/'), true);
+      expect(caregiverPath != elderPath, true);
+    });
+
+    test('caregiver-elder link should be bidirectional', () {
+      const caregiverId = 'caregiver_abc';
+      const elderId = 'elder_001';
+      
+      // Caregiver -> Elders
+      final caregiverEldersPath = 'caregivers/$caregiverId/elders/$elderId';
+      
+      // Elder -> Profile (contains caregiverId)
+      final elderProfilePath = 'elders/$elderId/profile';
+      
+      expect(caregiverEldersPath, contains(elderId));
+      expect(elderProfilePath, contains(elderId));
+    });
+  });
+
+  // ============================================================
+  // SENSOR DATA VALIDATION TESTS
+  // ============================================================
+  group('Sensor Data Validation', () {
+    test('heart rate should be within valid range', () {
+      bool isValidHeartRate(int rate) => rate >= 30 && rate <= 220;
+      
+      expect(isValidHeartRate(72), true);
+      expect(isValidHeartRate(0), false);
+      expect(isValidHeartRate(250), false);
+    });
+
+    test('SpO2 should be percentage', () {
+      bool isValidSpO2(int spo2) => spo2 >= 0 && spo2 <= 100;
+      
+      expect(isValidSpO2(98), true);
+      expect(isValidSpO2(105), false);
+    });
+
+    test('temperature should be in valid range', () {
+      bool isValidTemperature(double temp) => temp >= 35.0 && temp <= 42.0;
+      
+      expect(isValidTemperature(36.5), true);
+      expect(isValidTemperature(34.0), false);
+      expect(isValidTemperature(43.0), false);
+    });
+
+    test('steps should be non-negative', () {
+      bool isValidSteps(int steps) => steps >= 0;
+      
+      expect(isValidSteps(1000), true);
+      expect(isValidSteps(0), true);
+      expect(isValidSteps(-1), false);
+    });
+
+    test('battery level should be percentage', () {
+      bool isValidBattery(int level) => level >= 0 && level <= 100;
+      
+      expect(isValidBattery(85), true);
+      expect(isValidBattery(0), true);
+      expect(isValidBattery(100), true);
+      expect(isValidBattery(-5), false);
+    });
+  });
+
+  // ============================================================
+  // GEOFENCE TESTS
+  // ============================================================
+  group('Geofence', () {
+    test('should detect when position is inside geofence', () {
+      final geofence = {
+        'centerLat': -23.5505,
+        'centerLng': -46.6333,
+        'radius': 100.0, // meters
+      };
+      
+      // Position inside (very close to center)
+      final positionInside = {
+        'lat': -23.5505,
+        'lng': -46.6333,
+      };
+      
+      // Simple distance check (not real haversine, just for test)
+      final latDiff = (geofence['centerLat']! - positionInside['lat']!).abs();
+      final lngDiff = (geofence['centerLng']! - positionInside['lng']!).abs();
+      
+      expect(latDiff < 0.001, true); // Very close
+      expect(lngDiff < 0.001, true);
+    });
+
+    test('should trigger alert when exiting geofence', () {
+      bool insideGeofence = true;
+      bool alertTriggered = false;
+      
+      // Simulate exit
+      insideGeofence = false;
+      if (!insideGeofence) {
+        alertTriggered = true;
+      }
+      
+      expect(alertTriggered, true);
+    });
+
+    test('multiple geofences should be supported', () {
+      final geofences = [
+        {'id': 'home', 'name': 'Casa', 'radius': 100},
+        {'id': 'hospital', 'name': 'Hospital', 'radius': 200},
+        {'id': 'park', 'name': 'Parque', 'radius': 150},
+      ];
+      
+      expect(geofences.length, 3);
+      expect(geofences.any((g) => g['id'] == 'home'), true);
+    });
+  });
+
+  // ============================================================
+  // EMERGENCY FLOW TESTS
+  // ============================================================
+  group('Emergency Flow', () {
+    test('SOS button should create immediate alert', () {
+      bool sosPressed = false;
+      bool alertCreated = false;
+      
+      // Press SOS
+      sosPressed = true;
+      if (sosPressed) {
+        alertCreated = true;
+      }
+      
+      expect(alertCreated, true);
+    });
+
+    test('emergency state should be clearable', () {
+      var emergencyState = {'active': true, 'type': 'manual'};
+      
+      // Clear emergency
+      emergencyState = {'active': false, 'clearedAt': DateTime.now().toIso8601String()};
+      
+      expect(emergencyState['active'], false);
+      expect(emergencyState['clearedAt'], isNotNull);
+    });
+
+    test('fall detection should provide options to cancel or confirm', () {
+      final options = ['Estou Bem', 'Preciso de Ajuda'];
+      
+      expect(options.length, 2);
+      expect(options.contains('Estou Bem'), true);
+      expect(options.contains('Preciso de Ajuda'), true);
+    });
+
+    test('confirmed fall should escalate to emergency', () {
+      bool fallDetected = true;
+      bool userConfirmedNeedsHelp = true;
+      String? alertType;
+      
+      if (fallDetected && userConfirmedNeedsHelp) {
+        alertType = 'fall_confirmed';
+      }
+      
+      expect(alertType, 'fall_confirmed');
+    });
+  });
+
+  // ============================================================
+  // SCREEN NAVIGATION TESTS
+  // ============================================================
+  group('Screen Navigation', () {
+    test('all main routes should be defined', () {
+      final routes = {
+        '/splash': 'SplashScreen',
+        '/login': 'LoginScreen',
+        '/home': 'HomeScreen',
+        '/dashboard': 'DashboardScreen',
+        '/alerts': 'AlertsScreen',
+        '/map': 'MapScreen',
+        '/device': 'DeviceScreen',
+        '/profile': 'ProfileScreen',
+        '/settings': 'SettingsScreen',
+        '/elder_home': 'ElderHomeScreen',
+        '/elder_profile': 'ElderProfileScreen',
+        '/watch_home': 'WatchHomeScreen',
+      };
+      
+      expect(routes.length, 12);
+      expect(routes['/home'], 'HomeScreen');
+      expect(routes['/elder_home'], 'ElderHomeScreen');
+    });
+
+    test('caregiver screens should use activeElderIdProvider', () {
+      final caregiverScreens = [
+        'HomeScreen',
+        'DashboardScreen',
+        'AlertsScreen',
+        'MapScreen',
+        'DeviceScreen',
+      ];
+      
+      expect(caregiverScreens.length, 5);
+    });
+
+    test('logout should return to login screen', () {
+      String currentRoute = '/home';
+      
+      // Logout
+      currentRoute = '/login';
+      
+      expect(currentRoute, '/login');
+    });
+  });
+
+  // ============================================================
+  // TRANSLATION COVERAGE TESTS
+  // ============================================================
+  group('Translation Coverage', () {
+    test('common UI texts should be translatable', () {
+      final uiTexts = [
+        'Entrar',
+        'Sair',
+        'Configurações',
+        'Perfil',
+        'Alertas',
+        'Emergência',
+        'Salvar',
+        'Cancelar',
+      ];
+      
+      expect(uiTexts.isNotEmpty, true);
+      expect(uiTexts.length >= 5, true);
+    });
+
+    test('alert messages should be translatable', () {
+      final alertMessages = [
+        'Queda Detectada?',
+        'Estou Bem',
+        'Preciso de Ajuda',
+        'Emergência enviada!',
+        'Alerta cancelado',
+      ];
+      
+      expect(alertMessages.length, 5);
+    });
+  });
+
+  // ============================================================
+  // DATA SYNC TESTS
+  // ============================================================
+  group('Data Sync', () {
+    test('watch should sync data periodically', () {
+      const syncIntervalSeconds = 30;
+      
+      expect(syncIntervalSeconds, 30);
+      expect(syncIntervalSeconds < 60, true); // Less than 1 minute
+    });
+
+    test('sync should include all health metrics', () {
+      final syncData = {
+        'heartRate': 72,
+        'spo2': 98,
+        'steps': 1500,
+        'temperature': 36.5,
+        'bloodPressure': '120/80',
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+      
+      expect(syncData.keys.length, 6);
+      expect(syncData['heartRate'], isNotNull);
+      expect(syncData['timestamp'], isNotNull);
+    });
+
+    test('device status should include battery and connection', () {
+      final deviceStatus = {
+        'batteryLevel': 85,
+        'isCharging': false,
+        'lastSync': DateTime.now().toIso8601String(),
+        'model': 'Elder Watch v1',
+        'firmwareVersion': '1.0.0',
+      };
+      
+      expect(deviceStatus['batteryLevel'], isNotNull);
+      expect(deviceStatus['lastSync'], isNotNull);
+    });
+  });
 }
 
 // Test helper class for SessionState

@@ -8,6 +8,8 @@ import '../providers/elder_provider.dart';
 import '../models/health_data.dart';
 import '../services/firebase_sync_service.dart';
 
+import '../services/notification_service.dart';
+
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -32,7 +34,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // Firebase
   String get _elderId => ref.read(activeElderIdProvider) ?? 'elder_demo';
   final FirebaseSyncService _syncService = FirebaseSyncService();
+  final NotificationService _notificationService = NotificationService();
   StreamSubscription? _healthSubscription;
+  StreamSubscription? _alertsSubscription;
 
   // UI / timer
   int _updateInterval = 5;
@@ -52,17 +56,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     _subscribeToHealthData();
+    _subscribeToAlerts();
   }
 
   @override
   void dispose() {
     _healthSubscription?.cancel();
+    _alertsSubscription?.cancel();
     super.dispose();
   }
 
   // =========================
   // FIREBASE
   // =========================
+
+  void _subscribeToAlerts() {
+    // Listen for NEW alerts to trigger notifications
+    _alertsSubscription = _syncService
+        .listenToNewAlerts(_elderId)
+        .listen((alert) async {
+      
+      // Extract alert info
+      final type = alert['type'] as String? ?? 'info';
+      final elderName = ref.read(activeElderProvider)?['name'] ?? 'Idoso';
+      
+      // Trigger notification based on type
+      if (type == 'emergency' || type == 'fall' || type == 'fall_confirmed') {
+        await _notificationService.showEmergencyNotification(elderName);
+      } else if (type == 'geofence') {
+        await _notificationService.showGeofenceExitNotification(elderName);
+      } else if (type == 'battery') {
+        await _notificationService.showLowBatteryNotification(elderName, 15);
+      } else if (type == 'fall_detection') {
+        await _notificationService.showFallNotification(elderName);
+      }
+    });
+  }
 
   void _subscribeToHealthData() {
     _healthSubscription = _syncService

@@ -2,8 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:battery_plus/battery_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/health_sensor_service.dart';
 import '../services/watch_firebase_service.dart';
+import '../providers/locale_provider.dart';
 
 class WatchHomeScreen extends ConsumerStatefulWidget {
   const WatchHomeScreen({super.key});
@@ -26,17 +28,39 @@ class _WatchHomeScreenState extends ConsumerState<WatchHomeScreen> {
   bool _isSending = false;
   bool _isEmergency = false;
   bool _isConnected = false;
+  bool _fallDetected = false;
+  bool _isLinked = false;
   Timer? _updateTimer;
   StreamSubscription? _batterySubscription;
   
-  // Elder ID - would be configured during setup
-  final String _elderId = 'elder_demo';
+  // Elder ID - loaded from SharedPreferences
+  String _elderId = '';
 
   @override
   void initState() {
     super.initState();
-    _startMonitoring();
+    _loadElderId();
     _initBattery();
+  }
+
+  Future<void> _loadElderId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final elderId = prefs.getString('elder_id');
+    
+    if (elderId != null && elderId.isNotEmpty) {
+      setState(() {
+        _elderId = elderId;
+        _isLinked = true;
+      });
+      _startMonitoring();
+    } else {
+      // Not linked yet - show message but still allow usage
+      setState(() {
+        _elderId = 'pending_${DateTime.now().millisecondsSinceEpoch}';
+        _isLinked = false;
+      });
+      _startMonitoring();
+    }
   }
 
   @override
@@ -46,6 +70,7 @@ class _WatchHomeScreenState extends ConsumerState<WatchHomeScreen> {
     _sensorService.dispose();
     super.dispose();
   }
+
 
   void _initBattery() async {
     // Get initial battery level
@@ -79,6 +104,11 @@ class _WatchHomeScreenState extends ConsumerState<WatchHomeScreen> {
       setState(() => _steps = steps);
     });
 
+    // Start fall detection
+    _sensorService.startFallDetection(() {
+      _onFallDetected();
+    });
+
     // Simulate SpO2 and temperature readings (would come from real sensors)
     // These typically require specialized hardware APIs
     Timer.periodic(const Duration(seconds: 10), (_) {
@@ -98,6 +128,101 @@ class _WatchHomeScreenState extends ConsumerState<WatchHomeScreen> {
 
     // Initial send after 2 seconds
     Future.delayed(const Duration(seconds: 2), _sendDataToFirebase);
+  }
+
+  void _onFallDetected() {
+    if (_fallDetected) return; // Prevent multiple triggers
+    
+    setState(() => _fallDetected = true);
+    
+    // Send fall alert to Firebase
+    _firebaseService.sendEmergencyAlert(
+      elderId: _elderId,
+      type: 'fall',
+      message: 'Possível queda detectada!',
+    );
+
+    // Show confirmation dialog
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          backgroundColor: Colors.orange.shade900,
+          title: Row(
+            children: [
+              const Icon(Icons.warning, color: Colors.white),
+              const SizedBox(width: 8),
+              TranslatedText('Queda Detectada?', style: TextStyle(color: Colors.white)),
+            ],
+          ),
+          content: TranslatedText(
+            'Você está bem? Se não responder em 30 segundos, seu cuidador será alertado.',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _cancelFallAlert();
+              },
+              child: TranslatedText('Estou Bem', style: TextStyle(color: Colors.green)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _confirmFallEmergency();
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: TranslatedText('Preciso de Ajuda', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Auto-confirm emergency after 30 seconds if no response
+    Future.delayed(const Duration(seconds: 30), () {
+      if (_fallDetected && mounted) {
+        _confirmFallEmergency();
+      }
+    });
+  }
+
+  void _cancelFallAlert() {
+    setState(() => _fallDetected = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: TranslatedText('Alerta cancelado'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  void _confirmFallEmergency() {
+    _firebaseService.sendEmergencyAlert(
+      elderId: _elderId,
+      type: 'fall_confirmed',
+      message: 'QUEDA CONFIRMADA - Assistência necessária!',
+    );
+    
+    setState(() {
+      _fallDetected = false;
+      _isEmergency = true;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: TranslatedText('Emergência enviada ao cuidador!'),
+        backgroundColor: Colors.red,
+      ),
+    );
+
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        setState(() => _isEmergency = false);
+      }
+    });
   }
 
   Future<void> _sendDataToFirebase() async {

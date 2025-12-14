@@ -227,6 +227,20 @@ class FirebaseSyncService {
     });
   }
 
+  /// Listen only to NEW alerts (for notifications)
+  /// Returns stream of individual new alerts added after subscription
+  Stream<Map<String, dynamic>> listenToNewAlerts(String elderId) {
+    final ref = _database.ref(getAlertsPath(elderId));
+    // Listen to child_added events
+    // We filter by timestamp client-side or assume connection time
+    final startTime = DateTime.now().toIso8601String();
+    
+    return ref.orderByChild('timestamp').startAt(startTime).onChildAdded.map((event) {
+      if (event.snapshot.value == null) return <String, dynamic>{};
+      return Map<String, dynamic>.from(event.snapshot.value as Map);
+    });
+  }
+
   // ==================== Device Status Operations ====================
 
   /// Update device status (from smartwatch)
@@ -354,6 +368,17 @@ class FirebaseSyncService {
     // Link elder to caregiver
     await linkElderToCaregiver(caregiverId, elderId);
 
+    // Check if there is a pending elder registration for this email
+    if (email != null && email.isNotEmpty) {
+      final pendingAuthUid = await checkAndLinkPendingElder(email);
+      if (pendingAuthUid != null) {
+        // Link the auth UID immediately
+        await linkElderAuthUid(elderId, pendingAuthUid);
+        // Remove from pending
+        await removePendingElder(email);
+      }
+    }
+
     // Set as active elder if first one
     final elders = await getCaregiverElders(caregiverId);
     if (elders.length == 1) {
@@ -461,6 +486,96 @@ class FirebaseSyncService {
       if (!event.snapshot.exists) return null;
       return event.snapshot.value as String;
     });
+  }
+
+  /// Find elder by email (for automatic linking on login)
+  /// Returns elderId if found, null otherwise
+  Future<String?> findElderByEmail(String email) async {
+    if (email.isEmpty) return null;
+    
+    try {
+      final ref = _database.ref('elders');
+      final snapshot = await ref.get();
+      
+      if (!snapshot.exists) return null;
+      
+      final elders = snapshot.value as Map<dynamic, dynamic>;
+      
+      for (final entry in elders.entries) {
+        final elderId = entry.key as String;
+        final elderData = entry.value as Map<dynamic, dynamic>;
+        
+        // Check profile email
+        if (elderData['profile'] != null) {
+          final profile = elderData['profile'] as Map<dynamic, dynamic>;
+          final elderEmail = profile['email']?.toString().toLowerCase() ?? '';
+          
+          if (elderEmail == email.toLowerCase()) {
+            return elderId;
+          }
+        }
+      }
+      
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Update elder with their auth UID (for login linking)
+  Future<void> linkElderAuthUid(String elderId, String authUid) async {
+    final ref = _database.ref(getElderProfilePath(elderId));
+    await ref.update({
+      'authUid': authUid,
+      'linkedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Register a pending elder (logged in before caregiver added them)
+  /// This allows future linking when caregiver adds this email
+  Future<void> registerPendingElder({
+    required String email,
+    required String authUid,
+    required String name,
+  }) async {
+    if (email.isEmpty) return;
+    
+    final ref = _database.ref('pendingElders/${email.replaceAll('.', '_').replaceAll('@', '_')}');
+    await ref.set({
+      'email': email,
+      'authUid': authUid,
+      'name': name,
+      'createdAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Check for pending elder and link them when caregiver registers elder with matching email
+  Future<String?> checkAndLinkPendingElder(String email) async {
+    if (email.isEmpty) return null;
+    
+    try {
+      final key = email.replaceAll('.', '_').replaceAll('@', '_');
+      final ref = _database.ref('pendingElders/$key');
+      final snapshot = await ref.get();
+      
+      if (snapshot.exists) {
+        final data = snapshot.value as Map<dynamic, dynamic>;
+        return data['authUid'] as String?;
+      }
+      
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Remove pending elder after successful linking
+  Future<void> removePendingElder(String email) async {
+    if (email.isEmpty) return;
+    
+    final key = email.replaceAll('.', '_').replaceAll('@', '_');
+    final ref = _database.ref('pendingElders/$key');
+    await ref.remove();
   }
 }
 

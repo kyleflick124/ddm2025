@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/firebase_sync_service.dart';
 import '../providers/locale_provider.dart';
 import 'dart:convert';
@@ -25,11 +26,29 @@ class _ElderHomeScreenState extends ConsumerState<ElderHomeScreen> {
   bool _isSendingEmergency = false;
   String _lastSyncTime = 'Aguardando...';
   bool _isConnected = false;
+  bool _isLinked = false;
+  String _elderId = '';
 
   @override
   void initState() {
     super.initState();
+    _loadElderId();
     _checkConnection();
+  }
+
+  Future<void> _loadElderId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final elderId = prefs.getString('elder_id');
+    
+    setState(() {
+      if (elderId != null && elderId.isNotEmpty) {
+        _elderId = elderId;
+        _isLinked = true;
+      } else {
+        _elderId = 'pending';
+        _isLinked = false;
+      }
+    });
   }
 
   void _checkConnection() {
@@ -47,15 +66,22 @@ class _ElderHomeScreenState extends ConsumerState<ElderHomeScreen> {
   }
 
   Future<void> _sendEmergencyAlert() async {
+    if (_elderId.isEmpty || !_isLinked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TranslatedText('Aguarde seu cuidador vincular você.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    
     setState(() => _isSendingEmergency = true);
 
     try {
-      // TODO: Get actual elderId from auth/session
-      const elderId = 'elder_demo';
-      
       // Create emergency alert
       await _syncService.createAlert(
-        elderId,
+        _elderId,
         'EMERGÊNCIA - SOS',
         'O idoso acionou o botão de emergência!',
       );

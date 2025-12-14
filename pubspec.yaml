@@ -41,6 +41,9 @@ dependencies:
   # Smartwatch sensors
   sensors_plus: ^4.0.2
   battery_plus: ^6.0.3
+  
+  # Notifications
+  flutter_local_notifications: ^17.2.1
 
 dev_dependencies:
   flutter_test:
