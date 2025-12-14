@@ -334,15 +334,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       max: 500,
                       divisions: 48,
                       label: '${_safeRadius.toInt()} m',
-                      onChanged: (value) {
-                        setState(() {
-                          _safeRadius = value;
-                          if (_safeCenter != null) {
-                            final distance = _calculateDistance(
-                              _currentPosition, _safeCenter!);
-                            _isOutOfBounds = distance > _safeRadius;
-                          }
-                        });
+                      onChanged: (val) async {
+                        if (val != null) {
+                          setState(() => _interval = val);
+                          _startSimulation();
+
+                          // Save interval to SharedPreferences
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setInt('map_interval', val);
+                        }
                       },
                     ),
                   ],

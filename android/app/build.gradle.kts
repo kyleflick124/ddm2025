@@ -42,6 +42,12 @@ android {
     }
 }
 
+/* 🔽 ADICIONADO PARA GOOGLE LOGIN / FIREBASE 🔽 */
+dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:33.6.0"))
+    implementation("com.google.firebase:firebase-auth")
+}
+
 flutter {
     source = "../.."
 }

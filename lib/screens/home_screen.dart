@@ -51,6 +51,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void dispose() {
     _healthSubscription?.cancel();
     super.dispose();
+  void _refreshStatus() async {
+    final rand = Random();
+    final newHeartRate = 60 + rand.nextInt(60); // 60–120 bpm
+    final newSpo2 = 90 + rand.nextInt(10); // 90–99%
+    final newInsideGeofence = rand.nextBool();
+    final newLastUpdate = DateTime.now();
+
+    setState(() {
+      heartRate = newHeartRate;
+      spo2 = newSpo2;
+      insideGeofence = newInsideGeofence;
+      lastUpdate = newLastUpdate;
+      _progress = 0.0;
+    });
+
+    // Save to SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('heart_rate', newHeartRate);
+    await prefs.setInt('spo2', newSpo2);
+    await prefs.setBool('inside_geofence', newInsideGeofence);
+    await prefs.setString('last_update', newLastUpdate.toIso8601String());
   }
 
   void _subscribeToHealthData() {
@@ -110,6 +131,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (diff.inMinutes < 1) return 'Atualizado há poucos segundos';
     if (diff.inMinutes < 60) return 'Atualizado há ${diff.inMinutes} min';
     return 'Atualizado há ${diff.inHours} h';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSessionData();
+    _startAutoUpdate();
+  }
+
+  Future<void> _loadSessionData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      heartRate = prefs.getInt('heart_rate') ?? 78;
+      spo2 = prefs.getInt('spo2') ?? 96;
+      insideGeofence = prefs.getBool('inside_geofence') ?? true;
+      final lastUpdateStr = prefs.getString('last_update');
+      if (lastUpdateStr != null) {
+        lastUpdate = DateTime.tryParse(lastUpdateStr) ?? DateTime.now();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -267,11 +314,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     
                     const SizedBox(height: 8),
-                    TranslatedText(
+                    Text(
+                      'Próxima atualização em $_updateInterval s',
+                      style: TextStyle(
+                          fontSize: 12, color: cardTextColor.withOpacity(0.6)),
+                    ),
+                    Text(
                       _timeSinceUpdate(),
                       style: TextStyle(
-                          fontSize: 12,
-                          color: cardTextColor.withOpacity(0.6)),
+                          fontSize: 12, color: cardTextColor.withOpacity(0.6)),
                     ),
                     const SizedBox(height: 8),
                     ElevatedButton.icon(
@@ -307,6 +358,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   final hoverColor =
                       isDark ? Colors.teal[700]! : Colors.blue.shade200;
                   final iconColor = isDark ? Colors.white : Colors.blueAccent;
+
+                  if (item.title == 'Alertas') {
+                    return FutureBuilder<int>(
+                      future: _getUnreadCount(),
+                      builder: (context, snapshot) {
+                        final unread = snapshot.data ?? 0;
+                        final hasUnread = unread > 0;
+                        return _HoverAnimatedButton(
+                          color: hasUnread ? Colors.red.shade100 : baseColor,
+                          hoverColor:
+                              hasUnread ? Colors.red.shade200 : hoverColor,
+                          iconColor: hasUnread ? Colors.redAccent : iconColor,
+                          icon: item.icon,
+                          label: item.title,
+                          badgeCount: unread,
+                          onTap: () => Navigator.pushNamedAndRemoveUntil(
+                              context, item.route, (route) => route.isFirst),
+                        );
+                      },
+                    );
+                  }
 
                   return _HoverAnimatedButton(
                     color: baseColor,

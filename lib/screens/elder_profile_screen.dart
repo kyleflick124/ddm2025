@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class ProfileScreen extends ConsumerStatefulWidget {
-  const ProfileScreen({super.key});
+class ElderProfileScreen extends ConsumerStatefulWidget {
+  const ElderProfileScreen({super.key});
 
   @override
-  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ElderProfileScreen> createState() => _ElderProfileScreenState();
 }
 
-class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
   final _nameController = TextEditingController();
   final _ageController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -36,8 +36,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       _nameController.text = prefs.getString('elder_name') ?? 'João Silva';
       _ageController.text = prefs.getString('elder_age') ?? '75';
       _phoneController.text = prefs.getString('elder_phone') ?? '11 91234-5678';
-      _emailController.text =
-          prefs.getString('elder_email') ?? 'joao@example.com';
+      _emailController.text = prefs.getString('elder_email') ?? 'joao@example.com';
     });
   }
 
@@ -49,7 +48,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     await prefs.setString('elder_email', _emailController.text);
     setState(() => _isEditing = false);
     ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Dados do idoso salvos!')));
+        .showSnackBar(const SnackBar(content: Text('Dados salvos!')));
   }
 
   Future<void> _loadCaregivers() async {
@@ -137,7 +136,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         title: const Text('Perfil / Família'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+          onPressed: () => Navigator.pushReplacementNamed(context, '/elder_home'),
         ),
       ),
       body: SingleChildScrollView(
@@ -152,9 +151,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             const SizedBox(height: 24),
             _buildTextField("Nome", _nameController,
-                enabled: _isEditing,
-                textColor: textColor,
-                cardColor: cardColor),
+                enabled: _isEditing, textColor: textColor, cardColor: cardColor),
             const SizedBox(height: 12),
             _buildTextField("Idade", _ageController,
                 keyboardType: TextInputType.number,
@@ -175,20 +172,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 cardColor: cardColor),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _isEditing
-                  ? _saveElderData
-                  : () => setState(() => _isEditing = true),
+              onPressed: _isEditing ? _saveElderData : () => setState(() => _isEditing = true),
               style: ElevatedButton.styleFrom(backgroundColor: buttonColor),
-              child: Text(
-                  _isEditing
-                      ? 'Salvar dados do idoso'
-                      : 'Editar dados do idoso',
+              child: Text(_isEditing ? 'Salvar seus dados' : 'Editar seus dados',
                   style: TextStyle(color: Colors.black)),
             ),
             const SizedBox(height: 24),
             Text('Cuidadores cadastrados',
-                style:
-                    TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
             const SizedBox(height: 12),
             ListView.builder(
               shrinkWrap: true,
@@ -199,8 +190,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 return Card(
                   color: isDark ? (Colors.grey[850]!) : Colors.grey.shade400,
                   child: ListTile(
-                    title: Text(caregiver['name'] ?? '',
-                        style: TextStyle(color: textColor)),
+                    title: Text(caregiver['name'] ?? '', style: TextStyle(color: textColor)),
                     subtitle: Text(
                         '${caregiver['email'] ?? ''} | ${caregiver['phone'] ?? ''}',
                         style: TextStyle(color: textColor)),
@@ -214,8 +204,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             const SizedBox(height: 12),
             Text('Adicionar cuidador',
-                style:
-                    TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
             const SizedBox(height: 8),
             _buildTextField("Nome completo", _caregiverNameController,
                 textColor: textColor, cardColor: cardColor),
@@ -233,8 +222,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ElevatedButton(
               onPressed: _addCaregiver,
               style: ElevatedButton.styleFrom(backgroundColor: buttonColor),
-              child: const Text('Adicionar',
-                  style: TextStyle(color: Colors.black)),
+              child: const Text('Adicionar', style: TextStyle(color: Colors.black)),
             ),
           ],
         ),
@@ -243,10 +231,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildTextField(String label, TextEditingController controller,
-      {TextInputType? keyboardType,
-      bool enabled = true,
-      required Color textColor,
-      required Color cardColor}) {
+      {TextInputType? keyboardType, bool enabled = true, required Color textColor, required Color cardColor}) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
