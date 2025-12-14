@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/firebase_sync_service.dart';
+import '../providers/locale_provider.dart';
 
 class AlertsScreen extends StatefulWidget {
   const AlertsScreen({super.key});
@@ -74,7 +75,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+
 
     return Scaffold(
       appBar: AppBar(
@@ -97,16 +98,15 @@ class _AlertsScreenState extends State<AlertsScreen> {
                         color: Colors.grey[400],
                       ),
                       const SizedBox(height: 16),
-                      Text(
+                      const TranslatedText(
                         'Nenhum alerta',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white70 : Colors.black54,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Text(
+                      TranslatedText(
                         'Os alertas do smartwatch aparecerão aqui',
                         style: TextStyle(
                           color: Colors.grey[500],

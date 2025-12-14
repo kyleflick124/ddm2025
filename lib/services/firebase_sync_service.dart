@@ -39,6 +39,11 @@ class FirebaseSyncService {
     return 'elders/$elderId/geofences';
   }
 
+  /// Get path for heart rate history
+  static String getHeartRateHistoryPath(String elderId) {
+    return 'elders/$elderId/heartRateHistory';
+  }
+
   // ==================== Data Formatting ====================
 
   /// Format HealthData for Firebase write
@@ -90,6 +95,71 @@ class FirebaseSyncService {
     if (!snapshot.exists) return null;
     final data = snapshot.value as Map<dynamic, dynamic>;
     return HealthData.fromJson(Map<String, dynamic>.from(data));
+  }
+
+  // ==================== Heart Rate History Operations ====================
+
+  /// Add heart rate entry to history (from smartwatch)
+  Future<void> addHeartRateEntry(String elderId, int heartRate) async {
+    final ref = _database.ref(getHeartRateHistoryPath(elderId)).push();
+    await ref.set({
+      'heartRate': heartRate,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Listen to heart rate history (for caregiver app chart)
+  /// Returns last 24 hours of data
+  Stream<List<Map<String, dynamic>>> listenToHeartRateHistory(String elderId) {
+    final ref = _database.ref(getHeartRateHistoryPath(elderId));
+    return ref.onValue.map((event) {
+      final data = event.snapshot.value as Map<dynamic, dynamic>?;
+      if (data == null) return [];
+      
+      final now = DateTime.now();
+      final twentyFourHoursAgo = now.subtract(const Duration(hours: 24));
+      
+      final entries = data.entries
+          .map((e) => Map<String, dynamic>.from(e.value as Map))
+          .where((entry) {
+            try {
+              final timestamp = DateTime.parse(entry['timestamp'] as String);
+              return timestamp.isAfter(twentyFourHoursAgo);
+            } catch (_) {
+              return false;
+            }
+          })
+          .toList();
+      
+      // Sort by timestamp
+      entries.sort((a, b) => 
+          (a['timestamp'] as String).compareTo(b['timestamp'] as String));
+      
+      return entries;
+    });
+  }
+
+  /// Clean up old heart rate entries (older than 24h)
+  Future<void> cleanOldHeartRateEntries(String elderId) async {
+    final ref = _database.ref(getHeartRateHistoryPath(elderId));
+    final snapshot = await ref.get();
+    if (!snapshot.exists) return;
+    
+    final data = snapshot.value as Map<dynamic, dynamic>;
+    final now = DateTime.now();
+    final twentyFourHoursAgo = now.subtract(const Duration(hours: 24));
+    
+    for (final entry in data.entries) {
+      try {
+        final entryData = entry.value as Map;
+        final timestamp = DateTime.parse(entryData['timestamp'] as String);
+        if (timestamp.isBefore(twentyFourHoursAgo)) {
+          await ref.child(entry.key as String).remove();
+        }
+      } catch (_) {
+        // Skip invalid entries
+      }
+    }
   }
 
   // ==================== Location Operations ====================

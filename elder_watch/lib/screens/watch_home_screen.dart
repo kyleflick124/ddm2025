@@ -119,6 +119,14 @@ class _WatchHomeScreenState extends ConsumerState<WatchHomeScreen> {
         bloodPressure: '120/80', // Would need separate device
       );
 
+      // Send heart rate to history (for 24h chart)
+      if (_heartRate > 0) {
+        await _firebaseService.sendHeartRateToHistory(
+          elderId: _elderId,
+          heartRate: _heartRate,
+        );
+      }
+
       // Send location
       await _firebaseService.sendLocation(
         elderId: _elderId,
