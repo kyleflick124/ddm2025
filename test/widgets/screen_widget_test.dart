@@ -106,6 +106,121 @@ void main() {
       expect(find.byKey(const Key('emergency_button')), findsOneWidget);
       expect(find.text('Emergência'), findsOneWidget);
     });
+
+    testWidgets('Should show heart rate chart title', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Text(
+                  'Histórico de Batimentos (24h)',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Histórico de Batimentos (24h)'), findsOneWidget);
+    });
+
+    testWidgets('Should show empty chart state when no data', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Container(
+              key: const Key('empty_chart'),
+              height: 200,
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.show_chart, size: 48, color: Colors.grey),
+                    Text('Aguardando dados de batimentos...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byKey(const Key('empty_chart')), findsOneWidget);
+      expect(find.text('Aguardando dados de batimentos...'), findsOneWidget);
+      expect(find.byIcon(Icons.show_chart), findsOneWidget);
+    });
+
+    testWidgets('Should show heart rate legend', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Row(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      key: const Key('legend_normal'),
+                      width: 12,
+                      height: 12,
+                      decoration: const BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const Text('Normal (50-120)'),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Container(
+                      key: const Key('legend_critical'),
+                      width: 12,
+                      height: 12,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const Text('Crítico'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byKey(const Key('legend_normal')), findsOneWidget);
+      expect(find.byKey(const Key('legend_critical')), findsOneWidget);
+      expect(find.text('Normal (50-120)'), findsOneWidget);
+      expect(find.text('Crítico'), findsOneWidget);
+    });
+
+    testWidgets('Should display touched point info', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Container(
+              key: const Key('touched_info'),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.green,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                '75 bpm - 14:30',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byKey(const Key('touched_info')), findsOneWidget);
+      expect(find.text('75 bpm - 14:30'), findsOneWidget);
+    });
   });
 
   group('Settings Screen Widget Tests', () {

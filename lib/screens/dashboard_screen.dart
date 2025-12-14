@@ -16,12 +16,15 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   HealthData? _healthData;
   Map<String, dynamic>? _deviceStatus;
+  List<Map<String, dynamic>> _heartRateHistory = [];
   bool _isLoading = true;
+  int? _touchedIndex;
   
   final String _elderId = 'elder_demo';
   final FirebaseSyncService _syncService = FirebaseSyncService();
   StreamSubscription? _healthSubscription;
   StreamSubscription? _deviceSubscription;
+  StreamSubscription? _historySubscription;
 
   @override
   void initState() {
@@ -33,6 +36,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void dispose() {
     _healthSubscription?.cancel();
     _deviceSubscription?.cancel();
+    _historySubscription?.cancel();
     super.dispose();
   }
 
@@ -60,12 +64,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       }
     });
 
+    // Listen to heart rate history for chart
+    _historySubscription = _syncService
+        .listenToHeartRateHistory(_elderId)
+        .listen((history) {
+      setState(() {
+        _heartRateHistory = history;
+      });
+    });
+
     // No simulated fallback - just set loading to false
     Future.delayed(const Duration(seconds: 5), () {
       if (_isLoading) {
         setState(() {
           _isLoading = false;
-          // No simulated data - leave as null
         });
       }
     });
@@ -110,7 +122,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           style: TextStyle(color: Colors.white),
         ),
         onPressed: () {
-          // Create emergency alert in Firebase
           _syncService.createAlert(
             _elderId,
             'Emergência acionada',
@@ -176,9 +187,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             Container(
                               width: itemWidth,
                               decoration: BoxDecoration(
-                                color: item.color.withOpacity(0.08),
+                                color: item.color.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: item.color.withOpacity(0.3)),
+                                border: Border.all(color: item.color.withValues(alpha: 0.3)),
                               ),
                               padding: const EdgeInsets.symmetric(
                                 vertical: 12,
@@ -259,67 +270,300 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Activity Chart
-                  const TranslatedText(
-                    'Resumo de Atividade',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  // Interactive Heart Rate Chart
+                  _buildHeartRateChart(),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildHeartRateChart() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const TranslatedText(
+              'Histórico de Batimentos (24h)',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            if (_heartRateHistory.isNotEmpty)
+              Text(
+                '${_heartRateHistory.length} registros',
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        
+        if (_heartRateHistory.isEmpty)
+          Container(
+            height: 200,
+            decoration: BoxDecoration(
+              color: Colors.grey.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+            ),
+            child: const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.show_chart, size: 48, color: Colors.grey),
+                  SizedBox(height: 8),
+                  TranslatedText(
+                    'Aguardando dados de batimentos...',
+                    style: TextStyle(color: Colors.grey),
                   ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 200,
-                    child: LineChart(
-                      LineChartData(
-                        gridData: const FlGridData(show: true),
-                        titlesData: FlTitlesData(
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 22,
-                              interval: 1,
-                              getTitlesWidget: (value, meta) {
-                                return Text('${value.toInt()}h',
-                                    style: const TextStyle(fontSize: 10));
-                              },
-                            ),
-                          ),
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              interval: 10,
-                              getTitlesWidget: (value, meta) {
-                                return Text('${value.toInt()}m',
-                                    style: const TextStyle(fontSize: 10));
-                              },
-                            ),
-                          ),
-                        ),
-                        borderData: FlBorderData(show: true),
-                        lineBarsData: [
-                          LineChartBarData(
-                            isCurved: true,
-                            color: Colors.blueAccent,
-                            barWidth: 3,
-                            belowBarData: BarAreaData(
-                              show: true,
-                              color: Colors.blueAccent.withOpacity(0.2),
-                            ),
-                            spots: const [
-                              FlSpot(0, 10),
-                              FlSpot(1, 20),
-                              FlSpot(2, 35),
-                              FlSpot(3, 30),
-                              FlSpot(4, 40),
-                              FlSpot(5, 45),
-                              FlSpot(6, 50),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+                  SizedBox(height: 4),
+                  TranslatedText(
+                    'O gráfico aparecerá quando o relógio enviar dados',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
               ),
             ),
+          )
+        else
+          Container(
+            height: 250,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+            ),
+            child: Column(
+              children: [
+                // Touched point info
+                if (_touchedIndex != null && _touchedIndex! < _heartRateHistory.length)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: _getHeartRateColor(_heartRateHistory[_touchedIndex!]['heartRate'] as int),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${_heartRateHistory[_touchedIndex!]['heartRate']} bpm - ${_formatChartTime(_heartRateHistory[_touchedIndex!]['timestamp'] as String)}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                
+                // Chart
+                Expanded(
+                  child: LineChart(
+                    LineChartData(
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: 20,
+                        getDrawingHorizontalLine: (value) {
+                          // Highlight critical zones
+                          if (value == 120 || value == 50) {
+                            return FlLine(
+                              color: Colors.red.withValues(alpha: 0.5),
+                              strokeWidth: 1,
+                              dashArray: [5, 5],
+                            );
+                          }
+                          return FlLine(
+                            color: Colors.grey.withValues(alpha: 0.2),
+                            strokeWidth: 1,
+                          );
+                        },
+                      ),
+                      titlesData: FlTitlesData(
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 22,
+                            interval: _getChartInterval(),
+                            getTitlesWidget: (value, meta) {
+                              final index = value.toInt();
+                              if (index >= 0 && index < _heartRateHistory.length) {
+                                final timestamp = _heartRateHistory[index]['timestamp'] as String;
+                                return Transform.rotate(
+                                  angle: -0.5,
+                                  child: Text(
+                                    _formatChartTimeShort(timestamp),
+                                    style: const TextStyle(fontSize: 9),
+                                  ),
+                                );
+                              }
+                              return const Text('');
+                            },
+                          ),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 40,
+                            interval: 20,
+                            getTitlesWidget: (value, meta) {
+                              return Text(
+                                '${value.toInt()}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: value > 120 || value < 50 
+                                      ? Colors.red 
+                                      : Colors.grey,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      ),
+                      borderData: FlBorderData(
+                        show: true,
+                        border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                      ),
+                      minY: 40,
+                      maxY: 140,
+                      lineTouchData: LineTouchData(
+                        enabled: true,
+                        touchCallback: (event, response) {
+                          if (response?.lineBarSpots != null && 
+                              response!.lineBarSpots!.isNotEmpty) {
+                            setState(() {
+                              _touchedIndex = response.lineBarSpots!.first.spotIndex;
+                            });
+                          }
+                        },
+                        touchTooltipData: LineTouchTooltipData(
+                          getTooltipColor: (spot) => Colors.black87,
+                          getTooltipItems: (spots) {
+                            return spots.map((spot) {
+                              final hr = spot.y.toInt();
+                              return LineTooltipItem(
+                                '$hr bpm',
+                                TextStyle(
+                                  color: _getHeartRateColor(hr),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            }).toList();
+                          },
+                        ),
+                      ),
+                      lineBarsData: [
+                        LineChartBarData(
+                          isCurved: true,
+                          curveSmoothness: 0.3,
+                          color: Colors.redAccent,
+                          barWidth: 2,
+                          isStrokeCapRound: true,
+                          dotData: FlDotData(
+                            show: true,
+                            getDotPainter: (spot, percent, barData, index) {
+                              final hr = spot.y.toInt();
+                              final isCritical = hr > 120 || hr < 50;
+                              return FlDotCirclePainter(
+                                radius: isCritical ? 5 : 3,
+                                color: _getHeartRateColor(hr),
+                                strokeWidth: isCritical ? 2 : 1,
+                                strokeColor: Colors.white,
+                              );
+                            },
+                          ),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.redAccent.withValues(alpha: 0.3),
+                                Colors.redAccent.withValues(alpha: 0.0),
+                              ],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                          ),
+                          spots: _buildChartSpots(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        
+        // Legend
+        if (_heartRateHistory.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildLegendItem(Colors.green, 'Normal (50-120)'),
+                const SizedBox(width: 16),
+                _buildLegendItem(Colors.red, 'Crítico'),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  List<FlSpot> _buildChartSpots() {
+    return _heartRateHistory.asMap().entries.map((entry) {
+      final index = entry.key.toDouble();
+      final hr = (entry.value['heartRate'] as int).toDouble();
+      return FlSpot(index, hr);
+    }).toList();
+  }
+
+  double _getChartInterval() {
+    final count = _heartRateHistory.length;
+    if (count <= 10) return 1;
+    if (count <= 30) return 5;
+    if (count <= 60) return 10;
+    return (count / 6).roundToDouble();
+  }
+
+  Color _getHeartRateColor(int hr) {
+    if (hr > 120 || hr < 50) return Colors.red;
+    if (hr > 100 || hr < 60) return Colors.orange;
+    return Colors.green;
+  }
+
+  String _formatChartTime(String timestamp) {
+    try {
+      final dt = DateTime.parse(timestamp);
+      return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _formatChartTimeShort(String timestamp) {
+    try {
+      final dt = DateTime.parse(timestamp);
+      return '${dt.hour}h';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Widget _buildLegendItem(Color color, String label) {
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 12)),
+      ],
     );
   }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/firebase_sync_service.dart';
+import '../providers/locale_provider.dart';
 
 class DeviceScreen extends StatefulWidget {
   const DeviceScreen({super.key});
@@ -90,7 +91,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     
     // Extract device info from Firebase data
     final batteryLevel = _deviceStatus?['batteryLevel'] ?? 0;
@@ -174,7 +175,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       children: [
         const Icon(Icons.watch_off, size: 64, color: Colors.grey),
         const SizedBox(height: 16),
-        const Text(
+        const TranslatedText(
           'Relógio não conectado',
           style: TextStyle(
             fontSize: 18,
@@ -182,14 +183,14 @@ class _DeviceScreenState extends State<DeviceScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
+        TranslatedText(
           'Aguardando dados do smartwatch do idoso...',
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.grey[600]),
         ),
         const SizedBox(height: 16),
-        const Text(
-          'Certifique-se de que o relógio está:\n• Ligado\n• Com o app aberto\n• Conectado à internet',
+        const TranslatedText(
+          'Certifique-se de que o relógio está: Ligado, Com o app aberto, Conectado à internet',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 12, color: Colors.grey),
         ),

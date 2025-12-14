@@ -31,6 +31,22 @@ class WatchFirebaseService {
     }
   }
 
+  /// Add heart rate entry to history (for 24h chart)
+  Future<void> sendHeartRateToHistory({
+    required String elderId,
+    required int heartRate,
+  }) async {
+    try {
+      final ref = _database.ref('elders/$elderId/heartRateHistory').push();
+      await ref.set({
+        'heartRate': heartRate,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      // Silent fail for history entries
+    }
+  }
+
   /// Send current location to Firebase
   Future<void> sendLocation({required String elderId}) async {
     try {
