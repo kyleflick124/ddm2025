@@ -168,7 +168,7 @@ class _ElderHomeScreenState extends ConsumerState<ElderHomeScreen> {
                                 color: _isConnected ? Colors.green : Colors.red,
                               ),
                             ),
-                            Text(
+                            TranslatedText(
                               'Última sincronização: $_lastSyncTime',
                               style: TextStyle(
                                 fontSize: 12,

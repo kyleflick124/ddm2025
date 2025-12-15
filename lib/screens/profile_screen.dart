@@ -85,7 +85,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const TranslatedText('Remover idoso'),
-        content: Text('Deseja remover "$elderName" da sua lista?'),
+        content: TranslatedText('Deseja remover "$elderName" da sua lista?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -208,7 +208,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                Text(
+                TranslatedText(
                   '${elderState.elders.length} cadastrado(s)',
                   style: const TextStyle(color: Colors.white70),
                 ),
