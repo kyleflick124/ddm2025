@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../services/google_auth_service.dart';
 import '../services/firebase_sync_service.dart';
 import '../providers/elder_provider.dart';
@@ -17,279 +18,267 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  String? selectedRole; // 'cuidador' ou 'idoso'
+  String? selectedRole; // 'cuidador' | 'idoso'
   bool _isLoading = false;
-  final GoogleAuthService _googleAuthService = GoogleAuthService();
-  final FirebaseSyncService _syncService = FirebaseSyncService();
 
-  /// Check if running on a Wear OS smartwatch
+  final _googleAuthService = GoogleAuthService();
+  final _syncService = FirebaseSyncService();
+
+  /// Wear OS detection (SAFE)
   bool get _isSmartwatch {
-    if (kIsWeb) return false;
-    // Wear OS typically has small screen size
-    // Also check for Android (Wear OS is Android-based)
-    if (!Platform.isAndroid) return false;
-    
-    // Get screen size to check if it's a watch
-    // Watches typically have screen width < 300
-    final screenSize = WidgetsBinding.instance.platformDispatcher.views.first.physicalSize;
-    final pixelRatio = WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
-    final logicalWidth = screenSize.width / pixelRatio;
-    
-    return logicalWidth < 300;
+    try {
+      if (kIsWeb || !Platform.isAndroid) return false;
+
+      final views = WidgetsBinding.instance.platformDispatcher.views;
+      if (views.isEmpty) return false;
+
+      final view = views.first;
+      final logicalWidth =
+          view.physicalSize.width / view.devicePixelRatio;
+
+      return logicalWidth < 300;
+    } catch (_) {
+      return false;
+    }
   }
+
+  // ===================== LOGIN FLOW =====================
 
   Future<void> _loginWithGoogle() async {
     if (selectedRole == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: TranslatedText('Selecione como deseja acessar')),
-      );
+      _showSnack('Selecione como deseja acessar');
       return;
     }
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
-      final User? user = await _googleAuthService.signInWithGoogle();
-
-      if (!mounted) return;
-
-      if (user != null) {
-        await _handleSuccessfulLogin(user);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: TranslatedText('Login cancelado')),
-        );
+      final user = await _googleAuthService.signInWithGoogle();
+      if (!mounted || user == null) {
+        _showSnack('Login cancelado');
+        return;
       }
+
+      // 🚀 navegação IMEDIATA para idoso (não bloqueia UI)
+      if (selectedRole == 'idoso' && mounted) {
+        Future.microtask(() {
+          Navigator.pushReplacementNamed(
+            context,
+            _isSmartwatch ? '/watch_home' : '/elder_home',
+          );
+        });
+      }
+
+      await _handleSuccessfulLogin(user);
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro no login: $e')),
-      );
-    } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro no login: $e')));
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _handleSuccessfulLogin(User user) async {
     if (selectedRole == 'cuidador') {
-      // Save caregiver ID locally first (fast)
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('caregiver_id', user.uid);
-      
-      // Navigate immediately - don't wait for Firebase
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
-      }
-      
-      // Register caregiver in Firebase in background (don't await)
-      _syncService.registerCaregiver(
-        caregiverId: user.uid,
-        email: user.email ?? '',
-        name: user.displayName ?? 'Cuidador',
-      ).catchError((_) {});
-      
-      // Load elders in background (don't block navigation)
-      ref.read(elderProvider.notifier).setCaregiverId(user.uid);
-      
-    } else if (selectedRole == 'idoso') {
-      // Try to find elder by email
-      final elderEmail = user.email ?? '';
-      String? elderId = await _syncService.findElderByEmail(elderEmail);
-      
-      // Save elder info locally
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('elder_email', elderEmail);
-      await prefs.setString('elder_auth_uid', user.uid);
-      
-      if (elderId != null) {
-        // Elder found - link and save
-        await prefs.setString('elder_id', elderId);
-        
-        // Link auth UID to elder profile
-        _syncService.linkElderAuthUid(elderId, user.uid).catchError((_) {});
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: TranslatedText('Vinculado ao seu cuidador com sucesso!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } else {
-        // Elder not pre-registered - save pending registration
-        // When caregiver adds this email later, they will be linked
-        await _syncService.registerPendingElder(
-          email: elderEmail,
-          authUid: user.uid,
-          name: user.displayName ?? 'Idoso',
-        );
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: TranslatedText('Aguardando seu cuidador vincular você.'),
-              backgroundColor: Colors.blue,
-            ),
-          );
-        }
-      }
-      
-      // Navigate based on device type
-      if (_isSmartwatch) {
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/watch_home');
-        }
-      } else {
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/elder_home');
-        }
-      }
+      await _handleCaregiverLogin(user);
+    } else {
+      await _handleElderLogin(user);
     }
+  }
+
+  // ===================== CAREGIVER =====================
+
+  Future<void> _handleCaregiverLogin(User user) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('caregiver_id', user.uid);
+
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, '/home');
+    }
+
+    // background tasks
+    _syncService.registerCaregiver(
+      caregiverId: user.uid,
+      email: user.email ?? '',
+      name: user.displayName ?? 'Cuidador',
+    ).catchError((_) {});
+
+    ref.read(elderProvider.notifier).setCaregiverId(user.uid);
+  }
+
+  // ===================== ELDER =====================
+
+  Future<void> _handleElderLogin(User user) async {
+    final email = user.email ?? '';
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setString('elder_email', email);
+    await prefs.setString('elder_auth_uid', user.uid);
+
+    String? elderId;
+    try {
+      elderId = await _syncService
+          .findElderByEmail(email)
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {
+      elderId = null;
+    }
+
+    if (elderId != null) {
+      await prefs.setString('elder_id', elderId);
+
+      _syncService
+          .linkElderAuthUid(elderId, user.uid)
+          .catchError((_) {});
+
+      _showSnack(
+        'Vinculado ao seu cuidador com sucesso!',
+        color: Colors.green,
+      );
+    } else {
+      _syncService.registerPendingElder(
+        email: email,
+        authUid: user.uid,
+        name: user.displayName ?? 'Idoso',
+      ).catchError((_) {});
+
+      _showSnack(
+        'Aguardando seu cuidador vincular você.',
+        color: Colors.blue,
+      );
+    }
+  }
+
+  // ===================== UI =====================
+
+  void _showSnack(String text, {Color? color}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: TranslatedText(text),
+        backgroundColor: color,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 300;
-    
+    final isSmallScreen = MediaQuery.of(context).size.width < 300;
+
     return Scaffold(
       body: Stack(
         children: [
-          // Background gradient
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isDark
-                    ? [Colors.grey[900]!, Colors.grey[800]!]
-                    : [Colors.teal[50]!, Colors.white],
-              ),
-            ),
-          ),
-          
-          // Content
+          _buildBackground(isDark),
           Center(
             child: SingleChildScrollView(
               padding: EdgeInsets.all(isSmallScreen ? 8 : 24),
-              child: Card(
-                elevation: 8,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 20),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(isSmallScreen ? 12 : 32),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Logo/Icon
-                      Icon(
-                        Icons.elderly,
-                        size: isSmallScreen ? 40 : 80,
-                        color: Colors.teal,
-                      ),
-                      SizedBox(height: isSmallScreen ? 8 : 16),
-                      
-                      TranslatedText(
-                        'Elder Monitor',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: isSmallScreen ? 18 : 28, 
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: isSmallScreen ? 4 : 8),
-                      if (!isSmallScreen)
-                        TranslatedText(
-                          'Monitoramento de idosos',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                        ),
-
-                      SizedBox(height: isSmallScreen ? 12 : 32),
-
-                      TranslatedText(
-                        'Como deseja acessar?',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: isSmallScreen ? 12 : 16, 
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-
-                      SizedBox(height: isSmallScreen ? 8 : 16),
-
-                      // Role Selection
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _RoleCard(
-                              icon: Icons.person_outline,
-                              label: 'Cuidador',
-                              description: isSmallScreen ? '' : 'Monitore seus idosos',
-                              isSelected: selectedRole == 'cuidador',
-                              isCompact: isSmallScreen,
-                              onTap: () => setState(() => selectedRole = 'cuidador'),
-                            ),
-                          ),
-                          SizedBox(width: isSmallScreen ? 6 : 12),
-                          Expanded(
-                            child: _RoleCard(
-                              icon: Icons.elderly,
-                              label: 'Idoso',
-                              description: isSmallScreen ? '' : 'Veja seu status',
-                              isSelected: selectedRole == 'idoso',
-                              isCompact: isSmallScreen,
-                              onTap: () => setState(() => selectedRole = 'idoso'),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      SizedBox(height: isSmallScreen ? 12 : 24),
-
-                      // Google Login Button
-                      ElevatedButton.icon(
-                        icon: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Icon(Icons.login, size: isSmallScreen ? 16 : 24),
-                        label: TranslatedText(
-                          'Entrar',
-                          style: TextStyle(fontSize: isSmallScreen ? 12 : 16),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal,
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 8 : 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: _isLoading ? null : _loginWithGoogle,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              child: _buildCard(isSmallScreen),
             ),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildBackground(bool isDark) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [Colors.grey[900]!, Colors.grey[800]!]
+              : [Colors.teal[50]!, Colors.white],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCard(bool isSmallScreen) {
+    return Card(
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 20),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(isSmallScreen ? 12 : 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.elderly,
+                size: isSmallScreen ? 40 : 80, color: Colors.teal),
+            const SizedBox(height: 12),
+            const TranslatedText(
+              'Elder Monitor',
+              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 24),
+            const TranslatedText('Como deseja acessar?'),
+            const SizedBox(height: 16),
+            _buildRoles(isSmallScreen),
+            const SizedBox(height: 24),
+            _buildLoginButton(isSmallScreen),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoles(bool isSmall) {
+    return Row(
+      children: [
+        Expanded(
+          child: _RoleCard(
+            icon: Icons.person_outline,
+            label: 'Cuidador',
+            description: isSmall ? '' : 'Monitore seus idosos',
+            isSelected: selectedRole == 'cuidador',
+            isCompact: isSmall,
+            onTap: () => setState(() => selectedRole = 'cuidador'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _RoleCard(
+            icon: Icons.elderly,
+            label: 'Idoso',
+            description: isSmall ? '' : 'Veja seu status',
+            isSelected: selectedRole == 'idoso',
+            isCompact: isSmall,
+            onTap: () => setState(() => selectedRole = 'idoso'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoginButton(bool isSmall) {
+    return ElevatedButton.icon(
+      onPressed: _isLoading ? null : _loginWithGoogle,
+      icon: _isLoading
+          ? const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
+          : const Icon(Icons.login),
+      label: const TranslatedText('Entrar'),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.teal,
+        foregroundColor: Colors.white,
+        padding: EdgeInsets.symmetric(vertical: isSmall ? 8 : 16, horizontal: 32),
+      ),
+    );
+  }
 }
+
+// ===================== ROLE CARD =====================
 
 class _RoleCard extends StatelessWidget {
   final IconData icon;
@@ -304,8 +293,8 @@ class _RoleCard extends StatelessWidget {
     required this.label,
     required this.description,
     required this.isSelected,
-    this.isCompact = false,
     required this.onTap,
+    this.isCompact = false,
   });
 
   @override
@@ -316,40 +305,34 @@ class _RoleCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: EdgeInsets.all(isCompact ? 8 : 16),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.teal.withValues(alpha: 0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? Colors.teal : Colors.grey[300]!,
             width: isSelected ? 2 : 1,
           ),
+          color: isSelected
+              ? Colors.teal.withValues(alpha: 0.1)
+              : Colors.transparent,
         ),
         child: Column(
           children: [
-            Icon(
-              icon,
-              size: isCompact ? 24 : 40,
-              color: isSelected ? Colors.teal : Colors.grey,
-            ),
-            SizedBox(height: isCompact ? 4 : 8),
+            Icon(icon,
+                size: isCompact ? 24 : 40,
+                color: isSelected ? Colors.teal : Colors.grey),
+            const SizedBox(height: 6),
             Text(
               label,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: isCompact ? 11 : 14,
                 color: isSelected ? Colors.teal : Colors.grey[700],
               ),
             ),
             if (!isCompact && description.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(
-                description,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[500],
-                ),
-              ),
-            ],
+              Text(description,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+            ]
           ],
         ),
       ),
