@@ -232,7 +232,7 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller,
+  Widget _buildTextField(String labelKey, TextEditingController controller,
       {TextInputType? keyboardType, bool enabled = true, required Color textColor, required Color cardColor}) {
     return TextField(
       controller: controller,
