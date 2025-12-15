@@ -230,7 +230,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
 
                     const SizedBox(height: 8),
-                    Text(
+                    TranslatedText(
                       _timeSinceUpdate(),
                       style: TextStyle(fontSize: 12, color: cardTextColor),
                     ),

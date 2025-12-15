@@ -73,7 +73,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro no login: $e')));
+            .showSnackBar(SnackBar(content: TranslatedText('Erro no login: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -320,7 +320,7 @@ class _RoleCard extends StatelessWidget {
                 size: isCompact ? 24 : 40,
                 color: isSelected ? Colors.teal : Colors.grey),
             const SizedBox(height: 6),
-            Text(
+            TranslatedText(
               label,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
@@ -329,7 +329,7 @@ class _RoleCard extends StatelessWidget {
             ),
             if (!isCompact && description.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(description,
+              TranslatedText(description,
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 11, color: Colors.grey[500])),
             ]
